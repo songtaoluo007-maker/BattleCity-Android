@@ -52,6 +52,11 @@ internal fun BattleContent() {
         BattlefieldCanvas(engine, frame, Modifier.fillMaxSize())
         BattleHud(engine, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
         DirectionPad({ direction = it }, Modifier.align(Alignment.BottomStart).padding(20.dp))
+        SquadControls(
+            current = engine.squadOrder,
+            onChange = engine::setSquadOrder,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
+        )
         Button(
             onClick = engine::fire,
             enabled = engine.player.alive && !engine.victory,
@@ -73,7 +78,8 @@ private fun BattleHud(engine: GameEngine, modifier: Modifier) {
             color = Color(0xFFE8D9A7),
         )
         Text(
-            "${spec.shortName} HP ${engine.player.hp}/${engine.player.maxHp}  敌军在场 ${engine.enemies.size}  剩余 ${engine.enemiesLeft}",
+            "${spec.shortName} HP ${engine.player.hp}/${engine.player.maxHp}  " +
+                "友军 ${engine.alliesAlive}  敌军在场 ${engine.enemies.size}  剩余 ${engine.enemiesLeft}",
             color = Color(0xFFD8D0A8),
         )
         Text(engine.combatMessage, color = Color(0xFFFFE082))
@@ -104,6 +110,9 @@ private fun ResultPanel(engine: GameEngine, modifier: Modifier) {
             color = if (engine.victory) Color(0xFFFFD54F) else Color(0xFFFF6B5E),
             style = MaterialTheme.typography.headlineMedium,
         )
-        Text("战果 ${engine.destroyedEnemies}  得分 ${engine.score}", color = Color.White)
+        Text(
+            "战果 ${engine.destroyedEnemies}  友军存活 ${engine.alliesAlive}  得分 ${engine.score}",
+            color = Color.White,
+        )
     }
 }
