@@ -2,6 +2,7 @@ package com.songtaoluo.battlecity.ui
 
 import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -12,34 +13,39 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.pointerInput
+import com.songtaoluo.battlecity.game.BoardViewportCalculator
 import com.songtaoluo.battlecity.game.GameConstants
 import com.songtaoluo.battlecity.game.GameEngine
 import com.songtaoluo.battlecity.game.PowerUp
 import com.songtaoluo.battlecity.game.TacticalArea
 import com.songtaoluo.battlecity.game.Tank
+import com.songtaoluo.battlecity.game.TargetingMode
 import com.songtaoluo.battlecity.game.VehicleCatalog
 import com.songtaoluo.battlecity.model.Direction
 import com.songtaoluo.battlecity.model.PowerUpType
 import com.songtaoluo.battlecity.model.TeamSide
 import com.songtaoluo.battlecity.model.TileType
-import kotlin.math.min
 
 @Composable
 internal fun BattlefieldCanvas(engine: GameEngine, frame: Int, modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        frame
-        val availableWidth = (size.width - 300f).coerceAtLeast(220f)
-        val availableHeight = (size.height - 120f).coerceAtLeast(220f)
-        val boardScale = min(
-            availableWidth / GameConstants.BOARD_SIZE,
-            availableHeight / GameConstants.BOARD_SIZE,
-        ).coerceAtMost(1.25f)
-        val renderedSize = GameConstants.BOARD_SIZE * boardScale
-        val left = (size.width - renderedSize) / 2f
-        val top = 70f + (availableHeight - renderedSize) / 2f
+    val interactiveModifier = modifier.pointerInput(engine.targetingMode, engine.selectedFocusTargetId) {
+        detectTapGestures { tap ->
+            val viewport = BoardViewportCalculator.calculate(
+                width = size.width.toFloat(),
+                height = size.height.toFloat(),
+            )
+            viewport.toBoard(tap.x, tap.y)?.let { point ->
+                engine.handleBoardTap(point.x, point.y)
+            }
+        }
+    }
 
-        translate(left = left, top = top) {
-            scale(scaleX = boardScale, scaleY = boardScale, pivot = Offset.Zero) {
+    Canvas(interactiveModifier) {
+        frame
+        val viewport = BoardViewportCalculator.calculate(size.width, size.height)
+        translate(left = viewport.left, top = viewport.top) {
+            scale(scaleX = viewport.scale, scaleY = viewport.scale, pivot = Offset.Zero) {
                 drawRect(Color(0xFF293526), size = Size(GameConstants.BOARD_SIZE, GameConstants.BOARD_SIZE))
                 engine.tiles.forEachIndexed { row, values ->
                     values.forEachIndexed { column, tile -> drawBattleTile(tile, column, row) }
@@ -49,7 +55,12 @@ internal fun BattlefieldCanvas(engine: GameEngine, frame: Int, modifier: Modifie
                 engine.powerUps.forEach { drawPowerUp(it) }
                 if (engine.player.alive) drawTank(engine.player)
                 engine.allies.filter { it.alive }.forEach { drawTank(it) }
-                engine.enemies.filter { it.alive && it.isSpotted }.forEach { drawTank(it) }
+                engine.enemies.filter { it.alive && it.isSpotted }.forEach { enemy ->
+                    drawTank(enemy)
+                    if (enemy.id == engine.selectedFocusTargetId) {
+                        drawTargetRing(enemy)
+                    }
+                }
                 engine.bullets.forEach { bullet ->
                     drawCircle(
                         color = if (bullet.team == TeamSide.ENEMY) Color(0xFFFF7043) else Color(0xFFFFD54F),
@@ -58,9 +69,42 @@ internal fun BattlefieldCanvas(engine: GameEngine, frame: Int, modifier: Modifie
                     )
                 }
                 engine.effects.forEach { effect -> drawImpactEffect(effect) }
+                if (engine.targetingMode != TargetingMode.NONE) {
+                    drawRect(
+                        color = if (engine.targetingMode == TargetingMode.ARTILLERY) {
+                            Color(0xFFFF7043)
+                        } else {
+                            Color(0xFFFFD54F)
+                        },
+                        size = Size(GameConstants.BOARD_SIZE, GameConstants.BOARD_SIZE),
+                        style = Stroke(width = 4f),
+                    )
+                }
             }
         }
     }
+}
+
+private fun DrawScope.drawTargetRing(tank: Tank) {
+    val center = Offset(tank.position.x, tank.position.y)
+    drawCircle(
+        color = Color(0xFFFFEB3B),
+        radius = GameConstants.TANK_SIZE / 2f + 11f,
+        center = center,
+        style = Stroke(width = 3f),
+    )
+    drawLine(
+        color = Color(0xFFFFEB3B),
+        start = center + Offset(-24f, 0f),
+        end = center + Offset(-15f, 0f),
+        strokeWidth = 3f,
+    )
+    drawLine(
+        color = Color(0xFFFFEB3B),
+        start = center + Offset(15f, 0f),
+        end = center + Offset(24f, 0f),
+        strokeWidth = 3f,
+    )
 }
 
 private fun DrawScope.drawTacticalArea(area: TacticalArea, color: Color, alpha: Float) {
