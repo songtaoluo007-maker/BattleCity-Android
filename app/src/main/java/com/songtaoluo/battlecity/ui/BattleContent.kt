@@ -146,7 +146,7 @@ internal fun BattleContent(
         }
         if (engine.victory || engine.gameOver) {
             BlockingOverlay {
-                ResultPanel(
+                ResultArtPanel(
                     engine = engine,
                     onRestart = onRestart,
                     onExit = onExit,
@@ -256,36 +256,5 @@ private fun DirectionPad(
             Button(onClick = { onDirection(Direction.RIGHT) }, enabled = enabled) { Text("→") }
         }
         Button(onClick = { onDirection(Direction.DOWN) }, enabled = enabled) { Text("↓") }
-    }
-}
-
-@Composable
-private fun ResultPanel(
-    engine: GameEngine,
-    onRestart: () -> Unit,
-    onExit: () -> Unit,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.background(Color(0xEE111111)).padding(28.dp),
-    ) {
-        Text(
-            if (engine.victory) "任务完成" else "任务失败",
-            color = if (engine.victory) Color(0xFFFFD54F) else Color(0xFFFF6B5E),
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Text(
-            "战果 ${engine.destroyedEnemies}  友军存活 ${engine.alliesAlive}  得分 ${engine.score}",
-            color = Color.White,
-        )
-        Text(
-            "本局获得军费 ${(engine.credits - 1600).coerceAtLeast(0)}",
-            color = Color(0xFFE8D9A7),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = onRestart) { Text("再次作战") }
-            OutlinedButton(onClick = onExit) { Text("返回作战简报") }
-        }
     }
 }
