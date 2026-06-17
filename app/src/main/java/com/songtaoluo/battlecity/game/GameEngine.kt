@@ -3,6 +3,7 @@ package com.songtaoluo.battlecity.game
 import com.songtaoluo.battlecity.model.Direction
 import com.songtaoluo.battlecity.model.GridPoint
 import com.songtaoluo.battlecity.model.HitResult
+import com.songtaoluo.battlecity.model.SquadOrder
 import com.songtaoluo.battlecity.model.TankKind
 import com.songtaoluo.battlecity.model.TeamSide
 import com.songtaoluo.battlecity.model.TileType
@@ -26,9 +27,13 @@ class GameEngine {
         direction = Direction.UP,
     )
 
+    val allies: MutableList<Tank> = mutableListOf()
     val enemies: MutableList<Tank> = mutableListOf()
     val bullets: MutableList<Bullet> = mutableListOf()
     val effects: MutableList<ImpactEffect> = mutableListOf()
+
+    var squadOrder: SquadOrder = SquadOrder.FOLLOW
+        private set
 
     var score: Int = 0
         private set
@@ -60,7 +65,11 @@ class GameEngine {
     val enemiesLeft: Int
         get() = remainingEnemyBudget + enemies.count { it.alive }
 
+    val alliesAlive: Int
+        get() = allies.count { it.alive }
+
     init {
+        spawnAllies()
         val initialCount = minOf(
             scenario.enemySpawns.size,
             scenario.maxActiveEnemies,
@@ -70,13 +79,15 @@ class GameEngine {
     }
 
     fun update(deltaSeconds: Float, input: Direction?) {
+        ImpactEffectSystem.update(effects, deltaSeconds)
         if (victory || gameOver) return
 
-        ImpactEffectSystem.update(effects, deltaSeconds)
         updateCooldowns(deltaSeconds)
         updatePlayer(input, deltaSeconds)
+        updateAllies(deltaSeconds)
         updateEnemies(deltaSeconds)
         updateBullets(deltaSeconds)
+        allies.removeAll { !it.alive }
         enemies.removeAll { !it.alive }
         updateEnemySpawning(deltaSeconds)
         updateObjectiveState()
@@ -86,9 +97,22 @@ class GameEngine {
         fireTank(player)
     }
 
+    fun setSquadOrder(order: SquadOrder) {
+        squadOrder = order
+        combatMessage = when (order) {
+            SquadOrder.FOLLOW -> "编队命令：跟随座车推进"
+            SquadOrder.HOLD -> "编队命令：原地坚守并自由开火"
+            SquadOrder.ASSAULT -> "编队命令：向敌军发起突击"
+            SquadOrder.FOCUS_FIRE -> "编队命令：集中攻击最近目标"
+        }
+    }
+
     private fun updateCooldowns(deltaSeconds: Float) {
         val deltaMs = deltaSeconds * 1000f
         player.cooldownMs = (player.cooldownMs - deltaMs).coerceAtLeast(0f)
+        allies.forEach { ally ->
+            ally.cooldownMs = (ally.cooldownMs - deltaMs).coerceAtLeast(0f)
+        }
         enemies.forEach { enemy ->
             enemy.cooldownMs = (enemy.cooldownMs - deltaMs).coerceAtLeast(0f)
         }
@@ -104,20 +128,52 @@ class GameEngine {
                 direction = direction,
                 distance = speed * deltaSeconds,
                 tiles = tiles,
-                blockers = enemies,
+                blockers = allies + enemies,
+            )
+        }
+    }
+
+    private fun updateAllies(deltaSeconds: Float) {
+        val blockers = buildList {
+            add(player)
+            addAll(allies)
+            addAll(enemies)
+        }
+        val objective = gridToPosition(
+            GridPoint(scenario.objective.targetX, scenario.objective.targetY),
+        )
+        allies.toList().forEach { ally ->
+            AllyAiSystem.update(
+                ally = ally,
+                player = player,
+                enemies = enemies,
+                order = squadOrder,
+                deltaSeconds = deltaSeconds,
+                tiles = tiles,
+                blockers = blockers,
+                objective = objective,
+                fire = ::fireTank,
             )
         }
     }
 
     private fun updateEnemies(deltaSeconds: Float) {
+        val friendlies = buildList {
+            if (player.alive) add(player)
+            addAll(allies.filter { it.alive })
+        }
         val blockers = buildList {
             add(player)
+            addAll(allies)
             addAll(enemies)
         }
         enemies.toList().forEach { enemy ->
+            val target = friendlies.minByOrNull { friendly ->
+                EnemyAiSystem.distanceBetween(enemy, friendly)
+            } ?: return@forEach
             EnemyAiSystem.update(
                 enemy = enemy,
-                target = player,
+                target = target,
                 deltaSeconds = deltaSeconds,
                 tiles = tiles,
                 blockers = blockers,
@@ -159,7 +215,12 @@ class GameEngine {
             }
 
             val target = if (bullet.team == TeamSide.ENEMY) {
-                player.takeIf { it.alive && bullet.ownerId != it.id && intersects(bullet, it) }
+                buildList {
+                    if (player.alive) add(player)
+                    addAll(allies.filter { it.alive })
+                }.firstOrNull { friendly ->
+                    bullet.ownerId != friendly.id && intersects(bullet, friendly)
+                }
             } else {
                 enemies.firstOrNull { enemy ->
                     enemy.alive && bullet.ownerId != enemy.id && intersects(bullet, enemy)
@@ -189,6 +250,20 @@ class GameEngine {
                 combatMessage = "敌军增援抵达：剩余兵力 $enemiesLeft"
             }
             enemySpawnTimerMs = GameConstants.ENEMY_SPAWN_BASE_MS
+        }
+    }
+
+    private fun spawnAllies() {
+        scenario.allySpawns.forEachIndexed { index, spawn ->
+            val vehicleId = scenario.allyVehicles[index % scenario.allyVehicles.size]
+            val spec = VehicleCatalog.get(vehicleId)
+            allies += spec.createTank(
+                id = 100 + index,
+                position = gridToPosition(spawn),
+                team = TeamSide.ALLY,
+                kind = TankKind.ALLY,
+                direction = Direction.UP,
+            )
         }
     }
 
@@ -288,10 +363,10 @@ class GameEngine {
             HitResult.RICOCHET -> "$targetName 跳弹：穿深 ${bullet.penetration} 未击穿"
             HitResult.BLOCKED -> "$targetName 未击穿：炮弹被装甲吸收"
             HitResult.HIT -> "$targetName 命中，剩余 ${target.hp}/${target.maxHp} HP"
-            HitResult.DESTROY -> if (target.team == TeamSide.PLAYER) {
-                "座车被击毁，任务失败"
-            } else {
-                "$targetName 已摧毁，战果 $destroyedEnemies/${scenario.objective.requiredKills}"
+            HitResult.DESTROY -> when (target.team) {
+                TeamSide.PLAYER -> "座车被击毁，任务失败"
+                TeamSide.ALLY -> "友军 $targetName 被击毁，编队剩余 $alliesAlive"
+                TeamSide.ENEMY -> "$targetName 已摧毁，战果 $destroyedEnemies/${scenario.objective.requiredKills}"
             }
         }
     }
@@ -305,18 +380,23 @@ class GameEngine {
         val objectiveCenter = gridToPosition(
             GridPoint(scenario.objective.targetX, scenario.objective.targetY),
         )
-        val dx = player.position.x - objectiveCenter.x
-        val dy = player.position.y - objectiveCenter.y
-        val insideObjective = sqrt(dx * dx + dy * dy) <= scenario.objective.radius
+        val friendlyInsideObjective = buildList {
+            add(player)
+            addAll(allies.filter { it.alive })
+        }.any { friendly ->
+            val dx = friendly.position.x - objectiveCenter.x
+            val dy = friendly.position.y - objectiveCenter.y
+            sqrt(dx * dx + dy * dy) <= scenario.objective.radius
+        }
         val killsComplete = destroyedEnemies >= scenario.objective.requiredKills
 
-        if (killsComplete && insideObjective) {
+        if (killsComplete && friendlyInsideObjective) {
             victory = true
             score += 1000
             credits += 420
             combatMessage = "突破完成：北部防线已被撕开"
         } else if (killsComplete) {
-            combatMessage = "击毁目标已完成，进入北部红色目标区"
+            combatMessage = "击毁目标已完成，让任意友军进入北部红色目标区"
         }
     }
 
