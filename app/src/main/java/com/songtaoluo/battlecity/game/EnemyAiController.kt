@@ -29,6 +29,17 @@ internal object EnemyAiController {
             return
         }
 
+        // A tank boxed in on three or four sides should not spend a frame
+        // consuming the last sub-pixel of clearance before deciding to shoot.
+        // Detect the trap from adjacent terrain first, then break the only
+        // destructible route immediately.
+        val trappedWallDirection = trappedShootableWallDirection(enemy, tiles)
+        if (trappedWallDirection != null) {
+            enemy.direction = trappedWallDirection
+            fire(enemy)
+            return
+        }
+
         val movementDistance = MovementSystem.effectiveSpeed(enemy, tiles) * deltaSeconds
         val moved = preferredDirections(enemy, target).any { direction ->
             if (enemy.blockedMs > 0f && enemy.blockedDirection == direction) {
@@ -127,6 +138,26 @@ internal object EnemyAiController {
         return moved
     }
 
+    private fun trappedShootableWallDirection(
+        enemy: Tank,
+        tiles: List<List<TileType>>,
+    ): Direction? {
+        val directions = listOf(Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT)
+        val blockedDirections = directions.filter { direction ->
+            val tile = tileAhead(enemy, direction, tiles)
+            tile == null || tile.blocksTankMovement()
+        }
+        if (blockedDirections.size < 3) return null
+
+        val currentTile = tileAhead(enemy, enemy.direction, tiles)
+        if (enemy.direction in blockedDirections && currentTile.isDestructibleWall()) {
+            return enemy.direction
+        }
+        return blockedDirections.firstOrNull { direction ->
+            tileAhead(enemy, direction, tiles).isDestructibleWall()
+        }
+    }
+
     private fun shootableWallDirection(enemy: Tank, tiles: List<List<TileType>>): Direction? {
         val directions = listOf(
             enemy.direction,
@@ -136,8 +167,7 @@ internal object EnemyAiController {
             Direction.RIGHT,
         ).distinct()
         return directions.firstOrNull { direction ->
-            val tile = tileAhead(enemy, direction, tiles)
-            tile == TileType.BRICK || tile == TileType.VILLAGE
+            tileAhead(enemy, direction, tiles).isDestructibleWall()
         }
     }
 
@@ -172,6 +202,24 @@ internal object EnemyAiController {
         floor(value / GameConstants.TILE_SIZE)
             .toInt()
             .coerceIn(0, GameConstants.BOARD_TILES - 1)
+
+    private fun TileType?.isDestructibleWall(): Boolean =
+        this == TileType.BRICK || this == TileType.VILLAGE
+
+    private fun TileType.blocksTankMovement(): Boolean = when (this) {
+        TileType.BRICK,
+        TileType.STEEL,
+        TileType.BASE,
+        TileType.VILLAGE,
+        -> true
+
+        TileType.EMPTY,
+        TileType.WATER,
+        TileType.FOREST,
+        TileType.OBJECTIVE,
+        TileType.MINE,
+        -> false
+    }
 
     private fun TileType.blocksProjectileLine(): Boolean = when (this) {
         TileType.BRICK,
