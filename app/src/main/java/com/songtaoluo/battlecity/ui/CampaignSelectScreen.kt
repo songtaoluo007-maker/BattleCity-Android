@@ -22,11 +22,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.game.CampaignCatalog
 import com.songtaoluo.battlecity.game.MigratedContentCatalog
 import com.songtaoluo.battlecity.model.CampaignData
 import com.songtaoluo.battlecity.model.SaveData
+import com.songtaoluo.battlecity.ui.art.OriginalArtCatalog
+import com.songtaoluo.battlecity.ui.art.OriginalArtImage
 
 @Composable
 internal fun CampaignSelectScreen(
@@ -83,14 +86,20 @@ private fun CampaignCard(
     val playable = MigratedContentCatalog.isCampaignPlayable(campaign.id)
     val accent = Color(AndroidColor.parseColor(campaign.iconColor))
     Card(
-        modifier = Modifier.width(270.dp).height(250.dp),
+        modifier = Modifier.width(270.dp).height(330.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xEE1A1F1A)),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(18.dp),
+            modifier = Modifier.fillMaxSize().padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Spacer(Modifier.fillMaxWidth().height(8.dp).background(accent))
+            Spacer(Modifier.fillMaxWidth().height(6.dp).background(accent))
+            OriginalArtImage(
+                region = OriginalArtCatalog.campaign(campaign.id),
+                contentDescription = campaign.name,
+                modifier = Modifier.fillMaxWidth().height(92.dp).background(Color.Black),
+                contentScale = ContentScale.Crop,
+            )
             Text(campaign.name, color = Color.White, style = MaterialTheme.typography.titleLarge)
             Text(campaign.subtitle, color = Color(0xFFFFD54F))
             if (completed) Text("战役已完成", color = Color(0xFF9CCC65))
