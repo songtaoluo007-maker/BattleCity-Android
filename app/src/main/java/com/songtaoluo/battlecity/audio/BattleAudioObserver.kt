@@ -4,6 +4,7 @@ import com.songtaoluo.battlecity.game.Bullet
 import com.songtaoluo.battlecity.game.GameEngine
 import com.songtaoluo.battlecity.game.ImpactEffect
 import com.songtaoluo.battlecity.game.ImpactEffectKind
+import com.songtaoluo.battlecity.model.SquadOrder
 import java.util.Collections
 import java.util.IdentityHashMap
 
@@ -17,7 +18,7 @@ class BattleAudioObserver {
     private var initialized = false
     private var previousPowerUpCount = 0
     private var previousCommandPoints = 0
-    private var previousOrder: Any? = null
+    private var previousOrder: SquadOrder? = null
     private var smokeWasActive = false
     private var reconWasActive = false
     private var victoryWasActive = false
