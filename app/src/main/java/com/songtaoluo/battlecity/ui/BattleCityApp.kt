@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -13,15 +14,25 @@ import com.songtaoluo.battlecity.audio.MusicThemeResolver
 import com.songtaoluo.battlecity.game.CampaignCatalog
 import com.songtaoluo.battlecity.game.GameEngine
 import com.songtaoluo.battlecity.game.MigratedContentCatalog
+import com.songtaoluo.battlecity.game.ProgressionSystem
+import com.songtaoluo.battlecity.game.PurchaseResult
 import com.songtaoluo.battlecity.game.VehicleCatalog
+import com.songtaoluo.battlecity.game.VehiclePurchaseSystem
 import com.songtaoluo.battlecity.model.AppFlowState
 import com.songtaoluo.battlecity.model.AppStage
+import com.songtaoluo.battlecity.model.BattleSummary
+import com.songtaoluo.battlecity.model.CampaignData
+import com.songtaoluo.battlecity.model.SaveData
+import com.songtaoluo.battlecity.storage.AndroidSaveRepository
 
 @Composable
 fun BattleCityApp() {
-    var flow by remember { mutableStateOf(AppFlowState()) }
     val context = LocalContext.current
+    val saveRepository = remember { AndroidSaveRepository(context) }
     val audioController = remember { AndroidAudioController(context) }
+    var saveData by remember { mutableStateOf(saveRepository.load()) }
+    var flow by remember { mutableStateOf(AppFlowState()) }
+    var battleSessionId by remember { mutableIntStateOf(0) }
 
     val campaign = flow.campaignId?.let(CampaignCatalog::get)
     val scenarios = flow.campaignId
@@ -30,14 +41,28 @@ fun BattleCityApp() {
     val scenario = flow.scenarioId?.let { id -> scenarios.firstOrNull { it.id == id } }
     val vehicle = flow.vehicleId?.let(VehicleCatalog::get)
 
+    fun persist(updated: SaveData) {
+        val normalized = ProgressionSystem.normalize(updated)
+        saveRepository.save(normalized)
+        saveData = normalized
+    }
+
     DisposableEffect(audioController) {
         onDispose { audioController.close() }
     }
 
-    LaunchedEffect(flow.stage, scenario?.id) {
+    LaunchedEffect(flow.stage, scenario?.id, battleSessionId, saveData.audioSettings) {
+        val settings = saveData.audioSettings
+        audioController.setEnabled(settings.soundEnabled)
+        audioController.setMusicVolume(settings.musicVolume)
+        audioController.setEffectsVolume(settings.combatVolume)
+        if (!settings.soundEnabled) return@LaunchedEffect
+
         when (flow.stage) {
             AppStage.CAMPAIGN,
             AppStage.FACTION,
+            AppStage.PROFILE,
+            AppStage.SETTINGS,
             -> audioController.switchMusic(MusicThemeResolver.menuFor(null))
 
             AppStage.GARAGE,
@@ -50,10 +75,17 @@ fun BattleCityApp() {
         }
     }
 
+    val showCampaignHome: @Composable () -> Unit = {
+        CampaignHome(
+            saveData = saveData,
+            onSelect = { selected -> flow = flow.selectCampaign(selected.id) },
+            onProfile = { flow = flow.showProfile() },
+            onSettings = { flow = flow.showSettings() },
+        )
+    }
+
     when (flow.stage) {
-        AppStage.CAMPAIGN -> CampaignSelectScreen { selected ->
-            flow = flow.selectCampaign(selected.id)
-        }
+        AppStage.CAMPAIGN -> showCampaignHome()
 
         AppStage.FACTION -> {
             if (campaign != null && scenarios.isNotEmpty()) {
@@ -62,14 +94,17 @@ fun BattleCityApp() {
                     scenarios = scenarios,
                     onBack = { flow = flow.back() },
                     onSelect = { selected ->
+                        val defaultVehicle = selected.allyVehicles.firstOrNull {
+                            it in saveData.ownedVehicles
+                        } ?: selected.allyVehicles.firstOrNull()
                         flow = flow.selectScenario(
                             id = selected.id,
-                            defaultVehicleId = selected.allyVehicles.firstOrNull(),
+                            defaultVehicleId = defaultVehicle,
                         )
                     },
                 )
             } else {
-                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
+                showCampaignHome()
             }
         }
 
@@ -78,31 +113,62 @@ fun BattleCityApp() {
                 GarageScreen(
                     scenario = scenario,
                     selectedVehicleId = flow.vehicleId,
+                    credits = saveData.credits,
+                    ownedVehicles = saveData.ownedVehicles,
                     onBack = { flow = flow.back() },
-                    onSelect = { flow = flow.selectVehicle(it) },
+                    onSelect = { id ->
+                        if (id in saveData.ownedVehicles) flow = flow.selectVehicle(id)
+                    },
+                    onPurchase = { id ->
+                        when (val result = VehiclePurchaseSystem.purchase(saveData, VehicleCatalog.get(id))) {
+                            is PurchaseResult.Success -> {
+                                persist(result.save)
+                                flow = flow.selectVehicle(id)
+                            }
+                            PurchaseResult.AlreadyOwned -> flow = flow.selectVehicle(id)
+                            PurchaseResult.InsufficientCredits -> Unit
+                        }
+                    },
                     onContinue = { flow = flow.showBriefing() },
                 )
             } else {
-                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
+                showCampaignHome()
             }
         }
 
         AppStage.BRIEFING -> {
-            if (scenario != null && vehicle != null) {
+            if (scenario != null && vehicle != null && vehicle.id in saveData.ownedVehicles) {
                 BriefingScreen(
                     scenario = scenario,
                     vehicle = vehicle,
                     onBack = { flow = flow.back() },
-                    onStart = { flow = flow.startBattle() },
+                    onStart = {
+                        battleSessionId += 1
+                        flow = flow.startBattle()
+                    },
+                )
+            } else if (scenario != null) {
+                GarageScreen(
+                    scenario = scenario,
+                    selectedVehicleId = flow.vehicleId,
+                    credits = saveData.credits,
+                    ownedVehicles = saveData.ownedVehicles,
+                    onBack = { flow = flow.back() },
+                    onSelect = { id -> flow = flow.selectVehicle(id) },
+                    onPurchase = { id ->
+                        val result = VehiclePurchaseSystem.purchase(saveData, VehicleCatalog.get(id))
+                        if (result is PurchaseResult.Success) persist(result.save)
+                    },
+                    onContinue = { flow = flow.showBriefing() },
                 )
             } else {
-                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
+                showCampaignHome()
             }
         }
 
         AppStage.BATTLE -> {
-            if (scenario != null && vehicle != null) {
-                val engine = remember(scenario.id, vehicle.id) {
+            if (scenario != null && vehicle != null && vehicle.id in saveData.ownedVehicles) {
+                val engine = remember(scenario.id, vehicle.id, battleSessionId) {
                     GameEngine(
                         scenario = scenario,
                         selectedVehicleId = vehicle.id,
@@ -110,12 +176,63 @@ fun BattleCityApp() {
                 }
                 BattleScreen(
                     engine = engine,
+                    campaignId = flow.campaignId.orEmpty(),
                     audioController = audioController,
+                    onRestart = { battleSessionId += 1 },
                     onExit = { flow = flow.back() },
+                    onFinished = { summary ->
+                        persist(settleAndCompleteCampaign(saveData, summary))
+                    },
                 )
             } else {
-                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
+                showCampaignHome()
             }
         }
+
+        AppStage.PROFILE -> ProfileScreen(
+            saveData = saveData,
+            onSaveCallsign = { callsign ->
+                persist(ProgressionSystem.updateProfile(saveData, callsign))
+            },
+            onBack = { flow = flow.back() },
+        )
+
+        AppStage.SETTINGS -> SettingsScreen(
+            settings = saveData.audioSettings,
+            onUpdate = { settings -> persist(saveData.copy(audioSettings = settings.normalized())) },
+            onResetProgress = {
+                saveData = saveRepository.reset()
+                battleSessionId += 1
+                flow = AppFlowState()
+            },
+            onBack = { flow = flow.back() },
+        )
     }
+}
+
+@Composable
+private fun CampaignHome(
+    saveData: SaveData,
+    onSelect: (CampaignData) -> Unit,
+    onProfile: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    CampaignSelectScreen(
+        saveData = saveData,
+        onSelect = onSelect,
+        onProfile = onProfile,
+        onSettings = onSettings,
+    )
+}
+
+private fun settleAndCompleteCampaign(current: SaveData, summary: BattleSummary): SaveData {
+    var updated = ProgressionSystem.settleBattle(current, summary)
+    if (!summary.victory || summary.campaignId.isBlank()) return updated
+
+    val scenarioIds = MigratedContentCatalog.scenariosForCampaign(summary.campaignId)
+        .mapTo(mutableSetOf()) { it.id }
+    if (scenarioIds.isNotEmpty() && scenarioIds.all { it in updated.completedScenarios }) {
+        updated = ProgressionSystem.markCampaignCompleted(updated, summary.campaignId)
+    }
+    return updated
 }
