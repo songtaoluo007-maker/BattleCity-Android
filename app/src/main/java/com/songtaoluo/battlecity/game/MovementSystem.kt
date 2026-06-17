@@ -4,6 +4,7 @@ import com.songtaoluo.battlecity.model.Direction
 import com.songtaoluo.battlecity.model.TileType
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.min
 
 object MovementSystem {
     fun tryMove(
@@ -13,43 +14,56 @@ object MovementSystem {
         tiles: List<List<TileType>>,
         blockers: List<Tank> = emptyList(),
     ): Boolean {
-        if (!tank.alive || distance <= 0f) return false
+        if (!tank.alive || distance <= 0f || tank.trackBrokenMs == Float.POSITIVE_INFINITY) return false
 
-        val oldX = tank.position.x
-        val oldY = tank.position.y
+        var remaining = distance
+        var moved = 0f
+        while (remaining > GameConstants.MIN_LEGAL_MOVE) {
+            val step = min(GameConstants.MAX_MOVEMENT_SUBSTEP, remaining)
+            val oldX = tank.position.x
+            val oldY = tank.position.y
+            moveBy(tank, direction, step)
+            clampToBoard(tank)
 
-        when (direction) {
-            Direction.UP -> tank.position.y -= distance
-            Direction.DOWN -> tank.position.y += distance
-            Direction.LEFT -> tank.position.x -= distance
-            Direction.RIGHT -> tank.position.x += distance
+            val actualStep = abs(tank.position.x - oldX) + abs(tank.position.y - oldY)
+            val blocked = actualStep <= 0f ||
+                collidesWithSolid(tank, tiles) ||
+                blockers.any { other -> other.id != tank.id && other.alive && overlaps(tank, other) }
+
+            if (blocked) {
+                tank.position.x = oldX
+                tank.position.y = oldY
+                break
+            }
+
+            moved += actualStep
+            remaining -= step
         }
-        clampToBoard(tank)
 
-        val blockedByTerrain = collidesWithSolid(tank, tiles)
-        val blockedByTank = blockers.any { other ->
-            other.id != tank.id && other.alive && overlaps(tank, other)
-        }
-        if (blockedByTerrain || blockedByTank) {
-            tank.position.x = oldX
-            tank.position.y = oldY
-            tank.blockedMs = GameConstants.AI_BLOCKED_MS
-            tank.blockedDirection = direction
+        if (moved <= GameConstants.MIN_LEGAL_MOVE) {
+            rememberBlocked(tank, direction)
             return false
         }
 
-        if (tank.blockedDirection != direction) {
+        if (moved < distance * 0.72f) {
+            rememberBlocked(tank, direction)
+        } else if (tank.blockedDirection != direction) {
             tank.blockedMs = (tank.blockedMs - 80f).coerceAtLeast(0f)
         }
-        return tank.position.x != oldX || tank.position.y != oldY
+        return true
     }
 
-    fun effectiveSpeed(tank: Tank, tiles: List<List<TileType>>): Float =
+    fun effectiveSpeed(tank: Tank, tiles: List<List<TileType>>): Float {
+        var result = tank.speed
+        if (tank.speedBoostMs > 0f) result += GameConstants.POWER_UP_SPEED_BONUS
         if (tileAtCenter(tank, tiles) == TileType.WATER) {
-            tank.speed * GameConstants.WATER_SPEED_MULTIPLIER
-        } else {
-            tank.speed
+            result *= GameConstants.WATER_SPEED_MULTIPLIER
         }
+        if (tank.trackBrokenMs > 0f) {
+            result *= GameConstants.BROKEN_TRACK_SPEED_MULTIPLIER
+        }
+        return result
+    }
 
     fun tileAtCenter(tank: Tank, tiles: List<List<TileType>>): TileType {
         val column = floor(tank.position.x / GameConstants.TILE_SIZE)
@@ -94,6 +108,20 @@ object MovementSystem {
         val margin = GameConstants.TANK_SIZE / 2f + GameConstants.WALL_CLEARANCE
         tank.position.x = tank.position.x.coerceIn(margin, GameConstants.BOARD_SIZE - margin)
         tank.position.y = tank.position.y.coerceIn(margin, GameConstants.BOARD_SIZE - margin)
+    }
+
+    private fun moveBy(tank: Tank, direction: Direction, distance: Float) {
+        when (direction) {
+            Direction.UP -> tank.position.y -= distance
+            Direction.DOWN -> tank.position.y += distance
+            Direction.LEFT -> tank.position.x -= distance
+            Direction.RIGHT -> tank.position.x += distance
+        }
+    }
+
+    private fun rememberBlocked(tank: Tank, direction: Direction) {
+        tank.blockedMs = maxOf(tank.blockedMs, GameConstants.AI_BLOCKED_MS)
+        tank.blockedDirection = direction
     }
 
     private fun TileType.blocksTankMovement(): Boolean = when (this) {
