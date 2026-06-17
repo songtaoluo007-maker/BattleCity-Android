@@ -22,6 +22,9 @@ The original HarmonyOS repository remains unchanged. Historical scenarios, vehic
 - Collector-owned supply effects for player and allies
 - Artillery, recon, emergency repair, and smoke support skills
 - Command-point costs and per-skill cooldowns
+- Manual battlefield tap targeting for artillery and focus fire
+- Shared viewport mapping so rendered and tapped battlefield coordinates stay aligned
+- Focus-target marker, target-selection prompt, cancellation, and no-cost selection state
 - Tactical-area, supply, shield, APCR, track-damage, hit, and destruction visuals
 - JVM unit tests and GitHub Actions test/APK pipeline
 
@@ -29,12 +32,12 @@ Architecture and intentional improvements are documented in [`docs/ARCHITECTURE.
 
 ## Next stages
 
-1. Manual map targeting for artillery and focus-fire selection
-2. Campaign, faction, garage, and briefing screens
-3. Original tank assets and richer effects
-4. Audio, save data, achievements, and progression
-5. Remaining scenarios and static battlefield units
-6. Touch-control polish and device adaptation
+1. Campaign, faction, garage, and briefing screens
+2. Original tank assets and richer effects
+3. Audio, save data, achievements, and progression
+4. Remaining scenarios and static battlefield units
+5. Touch-control polish and device adaptation
+6. Battle replay and diagnostic telemetry
 
 ## Build
 
@@ -53,6 +56,7 @@ app/src/main/java/com/songtaoluo/battlecity/
 ├── game/
 │   ├── AllyAiController.kt
 │   ├── AllyAiSystem.kt
+│   ├── BoardViewport.kt
 │   ├── BulletCollisionSystem.kt
 │   ├── CombatResolver.kt
 │   ├── EnemyAiController.kt
@@ -61,7 +65,8 @@ app/src/main/java/com/songtaoluo/battlecity/
 │   ├── MovementSystem.kt
 │   ├── PowerUpSystem.kt
 │   ├── ProjectileSystem.kt
-│   └── TacticalSystems.kt
+│   ├── TacticalSystems.kt
+│   └── TargetingSystem.kt
 ├── model/
 └── ui/
     ├── BattleContent.kt
