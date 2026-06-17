@@ -85,6 +85,13 @@ enum class SquadOrder(val wireValue: String) {
     FOCUS_FIRE("focusFire"),
 }
 
+enum class SupportSkillType(val wireValue: String) {
+    ARTILLERY_BARRAGE("artilleryBarrage"),
+    RECON_FLARE("reconFlare"),
+    EMERGENCY_REPAIR("emergencyRepair"),
+    SMOKE_SCREEN("smokeScreen"),
+}
+
 enum class TankKind(val wireValue: String) {
     PLAYER("player"),
     ALLY("ally"),
