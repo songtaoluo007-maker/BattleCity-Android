@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.game.VehicleCatalog
 import com.songtaoluo.battlecity.model.ScenarioData
@@ -75,7 +76,7 @@ private fun VehicleCard(
     onPurchase: (VehicleId) -> Unit,
 ) {
     Card(
-        modifier = Modifier.width(290.dp).height(290.dp),
+        modifier = Modifier.width(310.dp).height(350.dp),
         colors = CardDefaults.cardColors(
             containerColor = when {
                 selected && owned -> Color(0xFF344233)
@@ -85,14 +86,36 @@ private fun VehicleCard(
         ),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(vehicle.displayName, color = if (owned) Color.White else Color(0xFF9A9C96), style = MaterialTheme.typography.titleMedium)
+            OriginalArtImage(
+                stem = OriginalArt.vehicleStem(vehicle.id),
+                contentDescription = vehicle.displayName,
+                contentScale = ContentScale.Fit,
+                fallbackLabel = vehicle.shortName,
+                modifier = Modifier.fillMaxWidth().height(125.dp),
+            )
+            Text(
+                vehicle.displayName,
+                color = if (owned) Color.White else Color(0xFF9A9C96),
+                style = MaterialTheme.typography.titleMedium,
+            )
             Text(vehicle.role.wireValue, color = Color(0xFFFFD54F))
-            Text(vehicle.history, color = Color(0xFFD6D8D1), modifier = Modifier.weight(1f))
-            Text("HP ${vehicle.hp}  速度 ${vehicle.speed.toInt()}  穿深 ${vehicle.penetration}", color = Color(0xFFB8BCAE))
-            Text("装甲 ${vehicle.armorFront}/${vehicle.armorSide}/${vehicle.armorRear}", color = Color(0xFFB8BCAE))
+            Text(
+                vehicle.history,
+                color = Color(0xFFD6D8D1),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "HP ${vehicle.hp}  速度 ${vehicle.speed.toInt()}  穿深 ${vehicle.penetration}",
+                color = Color(0xFFB8BCAE),
+            )
+            Text(
+                "装甲 ${vehicle.armorFront}/${vehicle.armorSide}/${vehicle.armorRear}",
+                color = Color(0xFFB8BCAE),
+            )
             if (owned) {
                 Button(onClick = { onSelect(vehicle.id) }, modifier = Modifier.fillMaxWidth()) {
                     Text(if (selected) "已选择" else "选择车辆")
