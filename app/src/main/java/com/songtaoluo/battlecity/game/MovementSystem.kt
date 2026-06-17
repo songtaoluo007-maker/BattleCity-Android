@@ -14,30 +14,21 @@ object MovementSystem {
         tiles: List<List<TileType>>,
         blockers: List<Tank> = emptyList(),
     ): Boolean {
-        if (!tank.alive || distance <= 0f || tank.trackBrokenMs == Float.POSITIVE_INFINITY) return false
+        if (!tank.alive || distance <= 0f) return false
 
         var remaining = distance
         var moved = 0f
         while (remaining > GameConstants.MIN_LEGAL_MOVE) {
-            val step = min(GameConstants.MAX_MOVEMENT_SUBSTEP, remaining)
-            val oldX = tank.position.x
-            val oldY = tank.position.y
-            moveBy(tank, direction, step)
+            val requestedStep = min(GameConstants.MAX_MOVEMENT_SUBSTEP, remaining)
+            val legalStep = maxLegalStep(tank, direction, requestedStep, tiles, blockers)
+            if (legalStep <= GameConstants.MIN_LEGAL_MOVE) break
+
+            moveBy(tank, direction, legalStep)
             clampToBoard(tank)
+            moved += legalStep
+            remaining -= legalStep
 
-            val actualStep = abs(tank.position.x - oldX) + abs(tank.position.y - oldY)
-            val blocked = actualStep <= 0f ||
-                collidesWithSolid(tank, tiles) ||
-                blockers.any { other -> other.id != tank.id && other.alive && overlaps(tank, other) }
-
-            if (blocked) {
-                tank.position.x = oldX
-                tank.position.y = oldY
-                break
-            }
-
-            moved += actualStep
-            remaining -= step
+            if (legalStep + GameConstants.MIN_LEGAL_MOVE < requestedStep) break
         }
 
         if (moved <= GameConstants.MIN_LEGAL_MOVE) {
@@ -108,6 +99,48 @@ object MovementSystem {
         val margin = GameConstants.TANK_SIZE / 2f + GameConstants.WALL_CLEARANCE
         tank.position.x = tank.position.x.coerceIn(margin, GameConstants.BOARD_SIZE - margin)
         tank.position.y = tank.position.y.coerceIn(margin, GameConstants.BOARD_SIZE - margin)
+    }
+
+    private fun maxLegalStep(
+        tank: Tank,
+        direction: Direction,
+        requestedStep: Float,
+        tiles: List<List<TileType>>,
+        blockers: List<Tank>,
+    ): Float {
+        if (canMoveBy(tank, direction, requestedStep, tiles, blockers)) return requestedStep
+
+        var low = 0f
+        var high = requestedStep
+        repeat(7) {
+            val middle = (low + high) / 2f
+            if (canMoveBy(tank, direction, middle, tiles, blockers)) {
+                low = middle
+            } else {
+                high = middle
+            }
+        }
+        return low
+    }
+
+    private fun canMoveBy(
+        tank: Tank,
+        direction: Direction,
+        distance: Float,
+        tiles: List<List<TileType>>,
+        blockers: List<Tank>,
+    ): Boolean {
+        val oldX = tank.position.x
+        val oldY = tank.position.y
+        moveBy(tank, direction, distance)
+        clampToBoard(tank)
+        val actualMove = abs(tank.position.x - oldX) + abs(tank.position.y - oldY)
+        val legal = actualMove > GameConstants.MIN_LEGAL_MOVE &&
+            !collidesWithSolid(tank, tiles) &&
+            blockers.none { other -> other.id != tank.id && other.alive && overlaps(tank, other) }
+        tank.position.x = oldX
+        tank.position.y = oldY
+        return legal
     }
 
     private fun moveBy(tank: Tank, direction: Direction, distance: Float) {
