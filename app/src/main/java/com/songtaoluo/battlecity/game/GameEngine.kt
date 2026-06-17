@@ -1,58 +1,171 @@
 package com.songtaoluo.battlecity.game
 
+import com.songtaoluo.battlecity.model.Direction
+import com.songtaoluo.battlecity.model.HitResult
+import com.songtaoluo.battlecity.model.TankKind
+import com.songtaoluo.battlecity.model.TeamSide
+import com.songtaoluo.battlecity.model.VehicleId
+import com.songtaoluo.battlecity.model.VehicleRole
 import kotlin.math.abs
 
 class GameEngine {
-    val player = Tank(Vec2(180f, 360f), Direction.UP, speed = 190f)
-    val enemy = Tank(Vec2(760f, 140f), Direction.DOWN, speed = 80f)
-    val bullets = mutableListOf<Bullet>()
+    private val playerVehicle = VehicleCatalog.get(VehicleId.PZ_IV_H)
+    private val enemyVehicle = VehicleCatalog.get(VehicleId.T34_76)
+
+    val player: Tank = playerVehicle.createTank(
+        id = GameConstants.PLAYER_ID,
+        position = Vec2(180f, 360f),
+        team = TeamSide.PLAYER,
+        kind = TankKind.PLAYER,
+        direction = Direction.UP,
+    )
+
+    var enemy: Tank = createEnemy()
+        private set
+
+    val bullets: MutableList<Bullet> = mutableListOf()
 
     var score: Int = 0
         private set
 
-    private var fireCooldown = 0f
+    var credits: Int = 1600
+        private set
+
+    var lastHitResult: HitResult? = null
+        private set
+
+    var combatMessage: String = "目标：击毁 T-34/76"
+        private set
 
     fun update(deltaSeconds: Float, width: Float, height: Float, input: Direction?) {
-        fireCooldown = (fireCooldown - deltaSeconds).coerceAtLeast(0f)
-        input?.let {
-            player.direction = it
-            move(player, it, player.speed * deltaSeconds)
+        player.cooldownMs = (player.cooldownMs - deltaSeconds * 1000f).coerceAtLeast(0f)
+
+        input?.let { direction ->
+            player.direction = direction
+            move(player, direction, player.speed * deltaSeconds)
         }
 
-        player.position.x = player.position.x.coerceIn(30f, width - 30f)
-        player.position.y = player.position.y.coerceIn(30f, height - 30f)
+        clampToViewport(player, width, height)
+        clampToViewport(enemy, width, height)
 
         bullets.forEach { bullet ->
-            when (bullet.direction) {
-                Direction.UP -> bullet.position.y -= bullet.speed * deltaSeconds
-                Direction.DOWN -> bullet.position.y += bullet.speed * deltaSeconds
-                Direction.LEFT -> bullet.position.x -= bullet.speed * deltaSeconds
-                Direction.RIGHT -> bullet.position.x += bullet.speed * deltaSeconds
-            }
+            moveBullet(bullet, deltaSeconds)
 
             if (bullet.position.x !in 0f..width || bullet.position.y !in 0f..height) {
                 bullet.active = false
             }
 
-            if (enemy.alive && abs(bullet.position.x - enemy.position.x) < 34f && abs(bullet.position.y - enemy.position.y) < 34f) {
+            if (bullet.active && bullet.team != enemy.team && enemy.alive && intersects(bullet, enemy)) {
                 bullet.active = false
-                enemy.alive = false
-                score += 100
+                val result = damageTank(enemy, bullet)
+                lastHitResult = result
+                combatMessage = when (result) {
+                    HitResult.RICOCHET -> "跳弹：穿深 ${bullet.penetration}，未击穿装甲"
+                    HitResult.BLOCKED -> "未击穿：仅造成表面损伤"
+                    HitResult.HIT -> "命中：T-34/76 剩余 ${enemy.hp}/${enemy.maxHp} HP"
+                    HitResult.DESTROY -> "目标摧毁，获得战果与军费"
+                }
             }
         }
+
         bullets.removeAll { !it.active }
     }
 
     fun fire() {
-        if (fireCooldown > 0f) return
-        bullets += Bullet(Vec2(player.position.x, player.position.y), player.direction)
-        fireCooldown = 0.22f
+        if (!player.alive || player.cooldownMs > 0f) return
+
+        val muzzle = Vec2(player.position.x, player.position.y)
+        val muzzleOffset = GameConstants.TANK_SIZE / 2f + 6f
+        when (player.direction) {
+            Direction.UP -> muzzle.y -= muzzleOffset
+            Direction.DOWN -> muzzle.y += muzzleOffset
+            Direction.LEFT -> muzzle.x -= muzzleOffset
+            Direction.RIGHT -> muzzle.x += muzzleOffset
+        }
+
+        bullets += Bullet(
+            ownerId = player.id,
+            team = player.team,
+            faction = player.faction,
+            position = muzzle,
+            direction = player.direction,
+            speed = player.bulletSpeed,
+            power = player.bulletPower,
+            penetration = player.penetration,
+        )
+        player.cooldownMs = player.reloadMs.toFloat()
     }
 
     fun restartEnemy() {
-        enemy.position.x = 760f
-        enemy.position.y = 140f
-        enemy.alive = true
+        enemy = createEnemy()
+        lastHitResult = null
+        combatMessage = "新目标进入战场"
+    }
+
+    private fun createEnemy(): Tank = enemyVehicle.createTank(
+        id = 2,
+        position = Vec2(760f, 140f),
+        team = TeamSide.ENEMY,
+        kind = TankKind.BASIC,
+        direction = Direction.DOWN,
+    )
+
+    private fun damageTank(target: Tank, bullet: Bullet): HitResult {
+        val armor = armorForHit(target, bullet.direction)
+
+        if (bullet.penetration < armor * GameConstants.PEN_RICOCHET_THRESHOLD) {
+            return HitResult.RICOCHET
+        }
+
+        val damage = when {
+            bullet.penetration >= armor -> bullet.power
+            bullet.penetration + 18 >= armor -> 1
+            else -> 0
+        }
+
+        if (damage <= 0) return HitResult.BLOCKED
+
+        target.hp -= damage
+        if (target.hp > 0) return HitResult.HIT
+
+        target.hp = 0
+        target.alive = false
+        val reward = when (VehicleCatalog.get(target.vehicleId).role) {
+            VehicleRole.HEAVY -> GameConstants.HEAVY_KILL_REWARD
+            VehicleRole.SCOUT -> GameConstants.SCOUT_KILL_REWARD
+            else -> GameConstants.DEFAULT_KILL_REWARD
+        }
+        score += reward
+        credits += reward / 4
+        return HitResult.DESTROY
+    }
+
+    private fun armorForHit(target: Tank, bulletDirection: Direction): Int = when {
+        bulletDirection == target.direction.opposite() -> target.armorFront
+        bulletDirection == target.direction -> target.armorRear
+        else -> target.armorSide
+    }
+
+    private fun intersects(bullet: Bullet, tank: Tank): Boolean {
+        val hitRadius = GameConstants.TANK_SIZE / 2f + 4f
+        return abs(bullet.position.x - tank.position.x) <= hitRadius &&
+            abs(bullet.position.y - tank.position.y) <= hitRadius
+    }
+
+    private fun clampToViewport(tank: Tank, width: Float, height: Float) {
+        val margin = GameConstants.TANK_SIZE / 2f + 2f
+        tank.position.x = tank.position.x.coerceIn(margin, (width - margin).coerceAtLeast(margin))
+        tank.position.y = tank.position.y.coerceIn(margin, (height - margin).coerceAtLeast(margin))
+    }
+
+    private fun moveBullet(bullet: Bullet, deltaSeconds: Float) {
+        val distance = bullet.speed * deltaSeconds
+        when (bullet.direction) {
+            Direction.UP -> bullet.position.y -= distance
+            Direction.DOWN -> bullet.position.y += distance
+            Direction.LEFT -> bullet.position.x -= distance
+            Direction.RIGHT -> bullet.position.x += distance
+        }
     }
 
     private fun move(tank: Tank, direction: Direction, distance: Float) {
