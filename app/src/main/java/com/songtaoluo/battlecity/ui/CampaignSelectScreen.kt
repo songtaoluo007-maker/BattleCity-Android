@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.game.CampaignCatalog
 import com.songtaoluo.battlecity.game.MigratedContentCatalog
@@ -83,14 +84,23 @@ private fun CampaignCard(
     val playable = MigratedContentCatalog.isCampaignPlayable(campaign.id)
     val accent = Color(AndroidColor.parseColor(campaign.iconColor))
     Card(
-        modifier = Modifier.width(270.dp).height(250.dp),
+        modifier = Modifier.width(290.dp).height(330.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xEE1A1F1A)),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(18.dp),
+            modifier = Modifier.fillMaxSize().padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Spacer(Modifier.fillMaxWidth().height(8.dp).background(accent))
+            OriginalVisualAssetCatalog.campaignStem(campaign.id)?.let { stem ->
+                OriginalResourceImage(
+                    stem = stem,
+                    contentDescription = campaign.name,
+                    modifier = Modifier.fillMaxWidth().height(118.dp),
+                    contentScale = ContentScale.Crop,
+                    fallbackColor = accent.copy(alpha = 0.35f),
+                )
+            }
+            Spacer(Modifier.fillMaxWidth().height(6.dp).background(accent))
             Text(campaign.name, color = Color.White, style = MaterialTheme.typography.titleLarge)
             Text(campaign.subtitle, color = Color(0xFFFFD54F))
             if (completed) Text("战役已完成", color = Color(0xFF9CCC65))
