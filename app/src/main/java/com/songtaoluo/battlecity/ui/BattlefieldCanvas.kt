@@ -8,12 +8,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import com.songtaoluo.battlecity.game.BoardViewportCalculator
 import com.songtaoluo.battlecity.game.GameConstants
 import com.songtaoluo.battlecity.game.GameEngine
@@ -26,9 +31,18 @@ import com.songtaoluo.battlecity.model.Direction
 import com.songtaoluo.battlecity.model.PowerUpType
 import com.songtaoluo.battlecity.model.TeamSide
 import com.songtaoluo.battlecity.model.TileType
+import com.songtaoluo.battlecity.ui.art.TankSpriteGeometry
+import com.songtaoluo.battlecity.ui.art.rememberBattlefieldTankSprites
+import kotlin.math.roundToInt
 
 @Composable
 internal fun BattlefieldCanvas(engine: GameEngine, frame: Int, modifier: Modifier = Modifier) {
+    val vehicleIds = buildSet {
+        add(engine.player.vehicleId)
+        engine.allies.forEach { add(it.vehicleId) }
+        engine.enemies.forEach { add(it.vehicleId) }
+    }
+    val tankSprites = rememberBattlefieldTankSprites(vehicleIds)
     val interactiveModifier = modifier.pointerInput(engine.targetingMode, engine.selectedFocusTargetId) {
         detectTapGestures { tap ->
             val viewport = BoardViewportCalculator.calculate(
@@ -53,10 +67,12 @@ internal fun BattlefieldCanvas(engine: GameEngine, frame: Int, modifier: Modifie
                 engine.reconArea?.let { drawTacticalArea(it, Color(0xFF64B5F6), 0.12f) }
                 engine.smokeArea?.let { drawTacticalArea(it, Color.White, 0.2f) }
                 engine.powerUps.forEach { drawPowerUp(it) }
-                if (engine.player.alive) drawTank(engine.player)
-                engine.allies.filter { it.alive }.forEach { drawTank(it) }
+                if (engine.player.alive) drawTank(engine.player, tankSprites[engine.player.vehicleId])
+                engine.allies.filter { it.alive }.forEach { ally ->
+                    drawTank(ally, tankSprites[ally.vehicleId])
+                }
                 engine.enemies.filter { it.alive && it.isSpotted }.forEach { enemy ->
-                    drawTank(enemy)
+                    drawTank(enemy, tankSprites[enemy.vehicleId])
                     if (enemy.id == engine.selectedFocusTargetId) {
                         drawTargetRing(enemy)
                     }
@@ -176,23 +192,90 @@ private fun DrawScope.drawBattleTile(tile: TileType, column: Int, row: Int) {
     }
 }
 
-private fun DrawScope.drawTank(tank: Tank) {
-    val spec = VehicleCatalog.get(tank.vehicleId)
-    val body = Color(AndroidColor.parseColor(spec.bodyColor))
-    val dark = Color(AndroidColor.parseColor(spec.darkColor))
-    val trim = Color(AndroidColor.parseColor(spec.trimColor))
+private fun DrawScope.drawTank(tank: Tank, sprite: ImageBitmap?) {
     val center = Offset(tank.position.x, tank.position.y)
-    val half = GameConstants.TANK_SIZE / 2f
+    val collisionHalf = GameConstants.TANK_SIZE / 2f
     val teamColor = when (tank.team) {
         TeamSide.PLAYER -> Color(0xFF42A5F5)
         TeamSide.ALLY -> Color(0xFF4DD0E1)
         TeamSide.ENEMY -> Color(0xFFEF5350)
     }
+    val spriteSize = sprite?.let { TankSpriteGeometry.boardSize(it.width, it.height) }
+    val recognitionRadius = maxOf(collisionHalf + 4f, (spriteSize?.width ?: GameConstants.TANK_SIZE.toInt()) / 2f + 1f)
 
-    drawCircle(teamColor, half + 4f, center, style = Stroke(width = 2f))
+    drawCircle(
+        color = Color.Black.copy(alpha = 0.34f),
+        radius = recognitionRadius - 1f,
+        center = center + Offset(2f, 3f),
+    )
+    drawCircle(teamColor, recognitionRadius, center, style = Stroke(width = 2.5f))
     if (tank.shieldMs > 0f) {
-        drawCircle(Color(0xFF90CAF9).copy(alpha = 0.75f), half + 8f, center, style = Stroke(width = 3f))
+        drawCircle(
+            Color(0xFF90CAF9).copy(alpha = 0.78f),
+            recognitionRadius + 5f,
+            center,
+            style = Stroke(width = 3f),
+        )
     }
+
+    if (sprite != null && spriteSize != null) {
+        drawTankSprite(sprite, spriteSize, center, tank.direction)
+    } else {
+        drawVectorTankFallback(tank, center, collisionHalf)
+    }
+
+    if (tank.trackBrokenMs > 0f) {
+        drawLine(Color(0xFFFFC107), center + Offset(-9f, 9f), center + Offset(9f, -9f), 3f)
+    }
+    if (tank.apcrShots > 0) {
+        drawCircle(Color(0xFFFFEB3B), 3f, center + Offset(recognitionRadius - 3f, -recognitionRadius + 3f))
+    }
+
+    val visualHalfHeight = when (tank.direction) {
+        Direction.UP, Direction.DOWN -> (spriteSize?.width ?: GameConstants.TANK_SIZE.toInt()) / 2f
+        Direction.LEFT, Direction.RIGHT -> (spriteSize?.height ?: GameConstants.TANK_SIZE.toInt()) / 2f
+    }
+    val hpWidth = maxOf(GameConstants.TANK_SIZE, spriteSize?.width?.toFloat() ?: GameConstants.TANK_SIZE)
+    val hpRatio = tank.hp.toFloat() / tank.maxHp.coerceAtLeast(1)
+    val hpTop = center.y - visualHalfHeight - 7f
+    drawRect(Color(0xAA111111), Offset(center.x - hpWidth / 2f, hpTop), Size(hpWidth, 4f))
+    drawRect(
+        if (hpRatio > 0.5f) Color(0xFF7EC850) else Color(0xFFD95C4F),
+        Offset(center.x - hpWidth / 2f, hpTop),
+        Size(hpWidth * hpRatio.coerceIn(0f, 1f), 4f),
+    )
+}
+
+private fun DrawScope.drawTankSprite(
+    sprite: ImageBitmap,
+    spriteSize: com.songtaoluo.battlecity.ui.art.TankSpriteSize,
+    center: Offset,
+    direction: Direction,
+) {
+    val destination = IntOffset(
+        x = (center.x - spriteSize.width / 2f).roundToInt(),
+        y = (center.y - spriteSize.height / 2f).roundToInt(),
+    )
+    rotate(
+        degrees = TankSpriteGeometry.rotationDegrees(direction),
+        pivot = center,
+    ) {
+        drawImage(
+            image = sprite,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(sprite.width, sprite.height),
+            dstOffset = destination,
+            dstSize = IntSize(spriteSize.width, spriteSize.height),
+            filterQuality = FilterQuality.Medium,
+        )
+    }
+}
+
+private fun DrawScope.drawVectorTankFallback(tank: Tank, center: Offset, half: Float) {
+    val spec = VehicleCatalog.get(tank.vehicleId)
+    val body = Color(AndroidColor.parseColor(spec.bodyColor))
+    val dark = Color(AndroidColor.parseColor(spec.darkColor))
+    val trim = Color(AndroidColor.parseColor(spec.trimColor))
     drawRect(
         dark,
         Offset(center.x - half - 3f, center.y - half),
@@ -211,19 +294,4 @@ private fun DrawScope.drawTank(tank: Tank) {
     }
     drawLine(dark, center, barrel, strokeWidth = 6f, cap = StrokeCap.Round)
     drawCircle(trim, 6f, center)
-
-    if (tank.trackBrokenMs > 0f) {
-        drawLine(Color(0xFFFFC107), center + Offset(-8f, 8f), center + Offset(8f, -8f), 3f)
-    }
-    if (tank.apcrShots > 0) {
-        drawCircle(Color(0xFFFFEB3B), 3f, center + Offset(half - 2f, -half + 2f))
-    }
-
-    val hpRatio = tank.hp.toFloat() / tank.maxHp.coerceAtLeast(1)
-    drawRect(Color(0xAA111111), Offset(center.x - half, center.y - half - 8f), Size(GameConstants.TANK_SIZE, 4f))
-    drawRect(
-        if (hpRatio > 0.5f) Color(0xFF7EC850) else Color(0xFFD95C4F),
-        Offset(center.x - half, center.y - half - 8f),
-        Size(GameConstants.TANK_SIZE * hpRatio.coerceIn(0f, 1f), 4f),
-    )
 }
