@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -23,7 +24,10 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.songtaoluo.battlecity.audio.AndroidAudioController
+import com.songtaoluo.battlecity.audio.BattleAudioObserver
 import com.songtaoluo.battlecity.game.GameEngine
 import com.songtaoluo.battlecity.game.TargetingMode
 import com.songtaoluo.battlecity.game.VehicleCatalog
@@ -38,14 +42,24 @@ internal fun BattleContent(
 ) {
     var direction by remember(engine) { mutableStateOf<Direction?>(null) }
     var frame by remember(engine) { mutableIntStateOf(0) }
+    val context = LocalContext.current
+    val audioController = remember { AndroidAudioController(context) }
+    val audioObserver = remember(engine) { BattleAudioObserver() }
 
-    LaunchedEffect(engine) {
+    DisposableEffect(audioController) {
+        onDispose { audioController.close() }
+    }
+
+    LaunchedEffect(engine, audioController, audioObserver) {
         var previous = 0L
+        audioObserver.reset(engine)
+        audioController.startBattleTheme(engine.scenario.faction)
         while (isActive) {
             withFrameNanos { now ->
                 if (previous != 0L) {
                     val delta = ((now - previous) / 1_000_000_000f).coerceAtMost(0.05f)
                     engine.update(delta, direction)
+                    audioObserver.collect(engine).forEach(audioController::play)
                     frame++
                 }
                 previous = now
