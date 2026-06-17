@@ -31,7 +31,7 @@ class GameEngine(
         kind = TankKind.PLAYER,
         direction = Direction.UP,
     ).apply {
-        shieldMs = 1600f
+        shieldMs = GameConstants.PLAYER_INITIAL_SHIELD_MS
     }
 
     val allies: MutableList<Tank> = mutableListOf()
@@ -44,6 +44,12 @@ class GameEngine(
         SupportSkillType.entries.associateWith { 0f }.toMutableMap()
 
     var squadOrder: SquadOrder = SquadOrder.FOLLOW
+        private set
+
+    var targetingMode: TargetingMode = TargetingMode.NONE
+        private set
+
+    var selectedFocusTargetId: Int? = null
         private set
 
     var commandPoints: Int = 3
@@ -93,6 +99,11 @@ class GameEngine(
     val alliesAlive: Int
         get() = allies.count { it.alive }
 
+    val selectedFocusTarget: Tank?
+        get() = selectedFocusTargetId?.let { id ->
+            enemies.firstOrNull { it.id == id && it.alive && it.isSpotted }
+        }
+
     init {
         spawnAllies()
         val initialCount = minOf(
@@ -107,7 +118,10 @@ class GameEngine(
     fun update(deltaSeconds: Float, input: Direction?) {
         ImpactEffectSystem.update(effects, deltaSeconds)
         updateTacticalTimers(deltaSeconds)
-        if (victory || gameOver) return
+        if (victory || gameOver) {
+            targetingMode = TargetingMode.NONE
+            return
+        }
 
         allTanks().forEach { tank -> TankStatusSystem.update(tank, deltaSeconds) }
         updatePlayer(input, deltaSeconds)
@@ -126,16 +140,53 @@ class GameEngine(
     }
 
     fun fire() {
+        if (targetingMode != TargetingMode.NONE) return
         fireTank(player)
     }
 
     fun setSquadOrder(order: SquadOrder) {
         squadOrder = order
+        if (order == SquadOrder.FOCUS_FIRE) {
+            targetingMode = TargetingMode.FOCUS_FIRE
+            combatMessage = "集火选敌：点击一辆已侦察敌车"
+            return
+        }
+
+        targetingMode = TargetingMode.NONE
+        selectedFocusTargetId = null
         combatMessage = when (order) {
             SquadOrder.FOLLOW -> "编队命令：跟随座车推进"
             SquadOrder.HOLD -> "编队命令：原地坚守并自由开火"
             SquadOrder.ASSAULT -> "编队命令：向敌军发起突击"
-            SquadOrder.FOCUS_FIRE -> "编队命令：集中攻击最近可见目标"
+            SquadOrder.FOCUS_FIRE -> error("Handled above")
+        }
+    }
+
+    fun cancelTargeting() {
+        if (targetingMode == TargetingMode.NONE) return
+        targetingMode = TargetingMode.NONE
+        combatMessage = "目标选择已取消"
+    }
+
+    fun handleBoardTap(boardX: Float, boardY: Float): Boolean = when (targetingMode) {
+        TargetingMode.NONE -> false
+        TargetingMode.ARTILLERY -> {
+            val used = useArtilleryAt(boardX, boardY)
+            if (used) targetingMode = TargetingMode.NONE
+            used
+        }
+        TargetingMode.FOCUS_FIRE -> {
+            val target = TargetingSystem.findSpottedEnemyAt(boardX, boardY, enemies)
+            if (target == null) {
+                combatMessage = "未选中可见敌车，请点击敌车识别环"
+                false
+            } else {
+                selectedFocusTargetId = target.id
+                squadOrder = SquadOrder.FOCUS_FIRE
+                targetingMode = TargetingMode.NONE
+                combatMessage = "集火目标：${tankName(target)}"
+                true
+            }
         }
     }
 
@@ -154,11 +205,19 @@ class GameEngine(
             return false
         }
 
-        val activated = when (skill) {
-            SupportSkillType.ARTILLERY_BARRAGE -> {
-                val target = bestArtilleryTarget() ?: return false
-                applyArtillery(target)
+        if (skill == SupportSkillType.ARTILLERY_BARRAGE) {
+            if (enemies.none { it.alive }) {
+                combatMessage = "炮击取消：当前没有敌军目标"
+                return false
             }
+            targetingMode = TargetingMode.ARTILLERY
+            combatMessage = "炮击选点：点击战场指定覆盖中心"
+            return true
+        }
+
+        targetingMode = TargetingMode.NONE
+        val activated = when (skill) {
+            SupportSkillType.ARTILLERY_BARRAGE -> error("Handled above")
             SupportSkillType.RECON_FLARE -> {
                 reconArea = TacticalArea(
                     center = Vec2(player.position.x, player.position.y),
@@ -212,7 +271,7 @@ class GameEngine(
     }
 
     private fun updatePlayer(input: Direction?, deltaSeconds: Float) {
-        if (!player.alive) return
+        if (!player.alive || targetingMode != TargetingMode.NONE) return
         input?.let { direction ->
             player.direction = direction
             MovementSystem.tryMove(
@@ -230,11 +289,17 @@ class GameEngine(
         val objective = gridToPosition(
             GridPoint(scenario.objective.targetX, scenario.objective.targetY),
         )
+        val focusedTarget = selectedFocusTarget
+        val availableTargets = if (squadOrder == SquadOrder.FOCUS_FIRE && focusedTarget != null) {
+            listOf(focusedTarget)
+        } else {
+            enemies
+        }
         allies.toList().forEach { ally ->
             AllyAiSystem.update(
                 ally = ally,
                 player = player,
-                enemies = enemies,
+                enemies = availableTargets,
                 order = squadOrder,
                 deltaSeconds = deltaSeconds,
                 tiles = tiles,
@@ -261,8 +326,8 @@ class GameEngine(
                 deltaSeconds = deltaSeconds,
                 tiles = tiles,
                 blockers = blockers,
-                fire = ::fireTank,
                 canSeeTarget = target in visibleTargets,
+                fire = ::fireTank,
             )
         }
     }
@@ -345,8 +410,13 @@ class GameEngine(
                 combatMessage = "${tankName(collector)} 获得2发高速穿甲弹"
             }
             PowerUpType.LIFE -> {
-                repairMostDamagedFriendly()
-                combatMessage = "战地维修补给已使用"
+                if (!repairMostDamagedFriendly()) {
+                    collector.shieldMs = maxOf(
+                        collector.shieldMs,
+                        GameConstants.REPAIR_FALLBACK_SHIELD_MS,
+                    )
+                    combatMessage = "编队满血：维修补给转化为临时防护"
+                }
             }
             PowerUpType.FREEZE -> {
                 frozenMs = maxOf(frozenMs, GameConstants.FREEZE_MS)
@@ -490,6 +560,9 @@ class GameEngine(
 
         target.hp = 0
         target.alive = false
+        if (target.id == selectedFocusTargetId) {
+            selectedFocusTargetId = null
+        }
         if (target.team == TeamSide.ENEMY) {
             destroyedEnemies += 1
             val reward = CombatResolver.rewardFor(target)
@@ -504,6 +577,7 @@ class GameEngine(
             }
         } else if (target.team == TeamSide.PLAYER) {
             gameOver = true
+            targetingMode = TargetingMode.NONE
         }
         return HitResult.DESTROY
     }
@@ -514,7 +588,7 @@ class GameEngine(
             .maxByOrNull { it.maxHp - it.hp }
             ?: return false
         target.hp = minOf(target.maxHp, target.hp + 2)
-        target.shieldMs = maxOf(target.shieldMs, 900f)
+        target.shieldMs = maxOf(target.shieldMs, GameConstants.REPAIR_FALLBACK_SHIELD_MS)
         effects += ImpactEffectSystem.hitFlash(target.position)
         combatMessage = "维修完成：${tankName(target)} 恢复至 ${target.hp}/${target.maxHp} HP"
         return true
@@ -527,9 +601,10 @@ class GameEngine(
         }
 
         var hits = 0
-        enemies.filter { it.alive }.forEach { enemy ->
-            val distance = distance(enemy.position, center)
-            if (distance <= GameConstants.AIR_STRIKE_RADIUS) {
+        var destroys = 0
+        enemies.filter { it.alive }.toList().forEach { enemy ->
+            val strikeDistance = distance(enemy.position, center)
+            if (strikeDistance <= GameConstants.AIR_STRIKE_RADIUS) {
                 enemy.trackBrokenMs = maxOf(enemy.trackBrokenMs, GameConstants.AIR_STRIKE_TRACK_MS)
                 val shell = Bullet(
                     ownerId = -1,
@@ -538,34 +613,31 @@ class GameEngine(
                     position = Vec2(center.x, center.y),
                     direction = Direction.DOWN,
                     speed = 0f,
-                    power = SupportSkillSystem.artilleryDamage(distance),
+                    power = SupportSkillSystem.artilleryDamage(strikeDistance),
                     penetration = 150,
                 )
-                damageTank(enemy, shell)
-                effects += ImpactEffectSystem.destroyFlash(enemy.position)
+                val result = damageTank(enemy, shell)
+                effects += if (result == HitResult.DESTROY) {
+                    destroys += 1
+                    ImpactEffectSystem.destroyFlash(enemy.position)
+                } else {
+                    ImpactEffectSystem.hitFlash(enemy.position)
+                }
                 hits += 1
             }
         }
         bombDestructibleTiles(center)
         effects += ImpactEffectSystem.destroyFlash(center)
-        combatMessage = "炮火覆盖完成：命中 $hits 辆敌车"
+        combatMessage = "炮火覆盖：命中 $hits 辆，摧毁 $destroys 辆"
         return true
     }
-
-    private fun bestArtilleryTarget(): Vec2? = enemies
-        .filter { it.alive }
-        .maxByOrNull { candidate ->
-            enemies.count { other ->
-                other.alive && distance(candidate.position, other.position) <= GameConstants.AIR_STRIKE_RADIUS
-            } * 1000 - distance(player.position, candidate.position).toInt()
-        }
-        ?.position
-        ?.let { Vec2(it.x, it.y) }
 
     private fun bombDestructibleTiles(center: Vec2) {
         tiles.forEachIndexed { row, values ->
             values.forEachIndexed { column, tile ->
-                if (tile != TileType.BRICK && tile != TileType.VILLAGE && tile != TileType.MINE) return@forEachIndexed
+                if (tile != TileType.BRICK && tile != TileType.VILLAGE && tile != TileType.MINE) {
+                    return@forEachIndexed
+                }
                 val tileCenter = Vec2(
                     column * GameConstants.TILE_SIZE + GameConstants.TILE_SIZE / 2f,
                     row * GameConstants.TILE_SIZE + GameConstants.TILE_SIZE / 2f,
@@ -593,6 +665,14 @@ class GameEngine(
 
     private fun updateSpotting() {
         VisibilitySystem.updateSpotted(enemies, player, allies, tiles, smokeArea, reconArea)
+        val selectedId = selectedFocusTargetId ?: return
+        val target = enemies.firstOrNull { it.id == selectedId }
+        if (target == null || !target.alive || !target.isSpotted) {
+            selectedFocusTargetId = null
+            if (squadOrder == SquadOrder.FOCUS_FIRE) {
+                combatMessage = "集火目标丢失：点击集火重新选择"
+            }
+        }
     }
 
     private fun hitMessage(target: Tank, bullet: Bullet, result: HitResult): String {
@@ -612,6 +692,7 @@ class GameEngine(
     private fun updateObjectiveState() {
         if (!player.alive) {
             gameOver = true
+            targetingMode = TargetingMode.NONE
             return
         }
 
@@ -625,6 +706,7 @@ class GameEngine(
 
         if (killsComplete && friendlyInsideObjective) {
             victory = true
+            targetingMode = TargetingMode.NONE
             score += 1000
             credits += 420
             combatMessage = "突破完成：北部防线已被撕开"
@@ -658,12 +740,12 @@ class GameEngine(
     }
 
     private fun moveBullet(bullet: Bullet, deltaSeconds: Float) {
-        val distance = bullet.speed * deltaSeconds
+        val bulletDistance = bullet.speed * deltaSeconds
         when (bullet.direction) {
-            Direction.UP -> bullet.position.y -= distance
-            Direction.DOWN -> bullet.position.y += distance
-            Direction.LEFT -> bullet.position.x -= distance
-            Direction.RIGHT -> bullet.position.x += distance
+            Direction.UP -> bullet.position.y -= bulletDistance
+            Direction.DOWN -> bullet.position.y += bulletDistance
+            Direction.LEFT -> bullet.position.x -= bulletDistance
+            Direction.RIGHT -> bullet.position.x += bulletDistance
         }
     }
 
