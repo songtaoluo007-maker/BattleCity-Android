@@ -6,7 +6,6 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.SoundPool
 import android.media.ToneGenerator
-import com.songtaoluo.battlecity.model.Faction
 import java.io.Closeable
 
 /**
@@ -27,10 +26,10 @@ class AndroidAudioController(
     }.getOrNull()
 
     private var musicPlayer: MediaPlayer? = null
-    private var currentMusicStem: String? = null
+    private var currentMusicTheme: MusicTheme? = null
     private var enabled = true
     private var effectsVolume = 0.78f
-    private var musicVolume = 0.62f
+    private var musicVolume = 0.72f
 
     init {
         val attributes = AudioAttributes.Builder()
@@ -70,36 +69,30 @@ class AndroidAudioController(
         val soundId = soundIds[cue]
         if (soundId != null && soundId in loadedSoundIds) {
             soundPool.play(soundId, effectsVolume, effectsVolume, 1, 0, 1f)
-        } else {
+        } else if (cue !in setOf(AudioCue.VICTORY, AudioCue.DEFEAT)) {
             playFallback(cue)
         }
     }
 
-    fun startBattleTheme(faction: Faction) {
-        val stem = when (faction) {
-            Faction.GERMAN -> "german_battle"
-            Faction.SOVIET -> "soviet_battle"
-            Faction.BRITISH -> "british_battle"
-            Faction.AMERICAN -> "american_battle"
-        }
-        if (!enabled || currentMusicStem == stem) return
+    fun switchMusic(theme: MusicTheme, loop: Boolean = true) {
+        if (!enabled || currentMusicTheme == theme) return
 
         stopMusic()
-        val resourceId = rawResourceId(stem)
+        val resourceId = resolveMusicResource(theme)
         if (resourceId == 0) return
 
         musicPlayer = runCatching {
             MediaPlayer.create(appContext, resourceId)?.apply {
-                isLooping = true
+                isLooping = loop
                 setVolume(musicVolume, musicVolume)
                 start()
             }
         }.getOrNull()
-        if (musicPlayer != null) currentMusicStem = stem
+        if (musicPlayer != null) currentMusicTheme = theme
     }
 
     fun stopMusic() {
-        currentMusicStem = null
+        currentMusicTheme = null
         val player = musicPlayer
         musicPlayer = null
         if (player != null) {
@@ -113,6 +106,15 @@ class AndroidAudioController(
         runCatching { soundPool.release() }
         runCatching { toneGenerator?.release() }
         loadedSoundIds.clear()
+    }
+
+    private fun resolveMusicResource(theme: MusicTheme): Int {
+        val preferred = rawResourceId(theme.resourceStem)
+        if (preferred != 0) return preferred
+        if (theme != MusicTheme.NEUTRAL_MENU) {
+            return rawResourceId(MusicTheme.NEUTRAL_MENU.resourceStem)
+        }
+        return 0
     }
 
     private fun rawResourceId(stem: String): Int =
