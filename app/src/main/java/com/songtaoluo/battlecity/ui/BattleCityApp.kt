@@ -1,10 +1,15 @@
 package com.songtaoluo.battlecity.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.songtaoluo.battlecity.audio.AndroidAudioController
+import com.songtaoluo.battlecity.audio.MusicThemeResolver
 import com.songtaoluo.battlecity.game.CampaignCatalog
 import com.songtaoluo.battlecity.game.GameEngine
 import com.songtaoluo.battlecity.game.MigratedContentCatalog
@@ -15,6 +20,8 @@ import com.songtaoluo.battlecity.model.AppStage
 @Composable
 fun BattleCityApp() {
     var flow by remember { mutableStateOf(AppFlowState()) }
+    val context = LocalContext.current
+    val audioController = remember { AndroidAudioController(context) }
 
     val campaign = flow.campaignId?.let(CampaignCatalog::get)
     val scenarios = flow.campaignId
@@ -22,6 +29,26 @@ fun BattleCityApp() {
         .orEmpty()
     val scenario = flow.scenarioId?.let { id -> scenarios.firstOrNull { it.id == id } }
     val vehicle = flow.vehicleId?.let(VehicleCatalog::get)
+
+    DisposableEffect(audioController) {
+        onDispose { audioController.close() }
+    }
+
+    LaunchedEffect(flow.stage, scenario?.id) {
+        when (flow.stage) {
+            AppStage.CAMPAIGN,
+            AppStage.FACTION,
+            -> audioController.switchMusic(MusicThemeResolver.menuFor(null))
+
+            AppStage.GARAGE,
+            AppStage.BRIEFING,
+            -> audioController.switchMusic(MusicThemeResolver.menuFor(scenario?.faction))
+
+            AppStage.BATTLE -> scenario?.let { selected ->
+                audioController.switchMusic(MusicThemeResolver.battleFor(selected))
+            }
+        }
+    }
 
     when (flow.stage) {
         AppStage.CAMPAIGN -> CampaignSelectScreen { selected ->
@@ -83,6 +110,7 @@ fun BattleCityApp() {
                 }
                 BattleScreen(
                     engine = engine,
+                    audioController = audioController,
                     onExit = { flow = flow.back() },
                 )
             } else {
