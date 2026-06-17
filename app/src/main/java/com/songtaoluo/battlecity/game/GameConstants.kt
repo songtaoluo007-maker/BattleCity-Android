@@ -39,9 +39,11 @@ object GameConstants {
     const val POWER_UP_SPAWN_MIN_MS = 9000f
     const val POWER_UP_SPAWN_RANGE_MS = 6000f
     const val POWER_UP_SIZE = 24f
+    const val PLAYER_INITIAL_SHIELD_MS = 1600f
     const val POWER_UP_SHIELD_MS = 4200f
     const val POWER_UP_SPEED_MS = 4200f
     const val POWER_UP_SPEED_BONUS = 42f
+    const val REPAIR_FALLBACK_SHIELD_MS = 900f
     const val FREEZE_MS = 3200f
     const val FREEZE_TRACK_MS = 2500f
     const val MINE_TRACK_MS = 4000f
