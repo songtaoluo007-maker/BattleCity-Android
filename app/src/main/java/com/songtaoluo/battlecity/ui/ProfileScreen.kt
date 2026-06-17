@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +30,8 @@ import com.songtaoluo.battlecity.game.AchievementCatalog
 import com.songtaoluo.battlecity.model.AchievementDefinition
 import com.songtaoluo.battlecity.model.Faction
 import com.songtaoluo.battlecity.model.SaveData
+import com.songtaoluo.battlecity.ui.art.OriginalArtCatalog
+import com.songtaoluo.battlecity.ui.art.OriginalArtImage
 
 @Composable
 internal fun ProfileScreen(
@@ -114,10 +117,11 @@ private fun AchievementCard(definition: AchievementDefinition, unlocked: Boolean
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                if (unlocked) definition.symbol else "锁",
-                color = if (unlocked) Color(0xFFFFD54F) else Color.Gray,
-                style = MaterialTheme.typography.headlineSmall,
+            OriginalArtImage(
+                region = OriginalArtCatalog.medal(definition.id, unlocked),
+                contentDescription = definition.name,
+                modifier = Modifier.size(54.dp),
+                alpha = if (unlocked) 1f else 0.72f,
             )
             Column(Modifier.weight(1f)) {
                 Text(
