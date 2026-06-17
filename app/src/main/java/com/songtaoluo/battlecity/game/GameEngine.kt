@@ -28,6 +28,7 @@ class GameEngine {
 
     val enemies: MutableList<Tank> = mutableListOf()
     val bullets: MutableList<Bullet> = mutableListOf()
+    val effects: MutableList<ImpactEffect> = mutableListOf()
 
     var score: Int = 0
         private set
@@ -71,6 +72,7 @@ class GameEngine {
     fun update(deltaSeconds: Float, input: Direction?) {
         if (victory || gameOver) return
 
+        ImpactEffectSystem.update(effects, deltaSeconds)
         updateCooldowns(deltaSeconds)
         updatePlayer(input, deltaSeconds)
         updateEnemies(deltaSeconds)
@@ -127,27 +129,34 @@ class GameEngine {
     private fun updateBullets(deltaSeconds: Float) {
         bullets.forEach { bullet ->
             moveBullet(bullet, deltaSeconds)
-
             if (bullet.position.x !in 0f..GameConstants.BOARD_SIZE ||
                 bullet.position.y !in 0f..GameConstants.BOARD_SIZE
             ) {
                 bullet.active = false
             }
+        }
 
-            if (bullet.active) {
-                val impact = ProjectileSystem.resolveTileImpact(bullet, tiles)
-                if (impact.consumed) {
-                    bullet.active = false
-                    if (bullet.team != TeamSide.ENEMY) score += impact.scoreDelta
-                    combatMessage = when {
-                        impact.baseHit -> "阵地基地遭到炮击"
-                        impact.destroyedTile -> "障碍物已摧毁"
-                        else -> "炮弹被装甲工事拦截"
-                    }
-                }
-            }
+        val collisions = BulletCollisionSystem.resolve(bullets)
+        if (collisions.isNotEmpty()) {
+            effects += collisions.map { ImpactEffectSystem.spark(it.position) }
+            combatMessage = "炮弹空中相撞 ${collisions.size} 次"
+        }
 
+        bullets.forEach { bullet ->
             if (!bullet.active) return@forEach
+
+            val impact = ProjectileSystem.resolveTileImpact(bullet, tiles)
+            if (impact.consumed) {
+                bullet.active = false
+                effects += ImpactEffectSystem.spark(bullet.position)
+                if (bullet.team != TeamSide.ENEMY) score += impact.scoreDelta
+                combatMessage = when {
+                    impact.baseHit -> "阵地基地遭到炮击"
+                    impact.destroyedTile -> "障碍物已摧毁"
+                    else -> "炮弹被装甲工事拦截"
+                }
+                return@forEach
+            }
 
             val target = if (bullet.team == TeamSide.ENEMY) {
                 player.takeIf { it.alive && bullet.ownerId != it.id && intersects(bullet, it) }
@@ -161,6 +170,10 @@ class GameEngine {
                 bullet.active = false
                 val result = damageTank(target, bullet)
                 lastHitResult = result
+                effects += when (result) {
+                    HitResult.DESTROY -> ImpactEffectSystem.destroyFlash(target.position)
+                    else -> ImpactEffectSystem.hitFlash(target.position)
+                }
                 combatMessage = hitMessage(target, bullet, result)
             }
         }
