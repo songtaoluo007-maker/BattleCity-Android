@@ -36,6 +36,18 @@ class BulletCollisionSystemTest {
     }
 
     @Test
+    fun playerAndAllyProjectilesRemainCompatible() {
+        val playerBullet = bullet(100f, 100f, TeamSide.PLAYER)
+        val allyBullet = bullet(102f, 100f, TeamSide.ALLY)
+
+        val collisions = BulletCollisionSystem.resolve(mutableListOf(playerBullet, allyBullet))
+
+        assertTrue(collisions.isEmpty())
+        assertTrue(playerBullet.active)
+        assertTrue(allyBullet.active)
+    }
+
+    @Test
     fun consumedProjectileCannotCancelMultipleTargets() {
         val playerBullet = bullet(100f, 100f, TeamSide.PLAYER)
         val firstEnemy = bullet(104f, 100f, TeamSide.ENEMY)
@@ -64,9 +76,13 @@ class BulletCollisionSystemTest {
     }
 
     private fun bullet(x: Float, y: Float, team: TeamSide): Bullet = Bullet(
-        ownerId = if (team == TeamSide.PLAYER) 1 else 2,
+        ownerId = when (team) {
+            TeamSide.PLAYER -> 1
+            TeamSide.ALLY -> 100
+            TeamSide.ENEMY -> 2
+        },
         team = team,
-        faction = if (team == TeamSide.PLAYER) Faction.GERMAN else Faction.SOVIET,
+        faction = if (team == TeamSide.ENEMY) Faction.SOVIET else Faction.GERMAN,
         position = Vec2(x, y),
         direction = Direction.UP,
         speed = 300f,
