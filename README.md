@@ -27,25 +27,31 @@ Implemented:
 - Steel destruction for shells with at least 130 penetration
 - Projectile blocking, base impact reporting, and terrain score rewards
 - Opposing projectile-to-projectile collision
+- Player and ally projectiles treated as the same side
 - Short-lived spark, hit-flash, and destruction visual feedback
 - Deterministic enemy pursuit with obstacle detours
 - Enemy line-of-fire checks and autonomous fire
 - Trapped enemy wall escape through destructible terrain
 - Scenario enemy budget, reinforcement timing, and five-unit active cap
 - Enemy damage against the player and mission failure state
-- Kursk breakthrough objective: required kills plus target-zone entry
+- Two scenario-defined ally tanks
+- Ally formation movement and autonomous fire
+- Follow, hold, assault, and focus-fire squad commands
+- Enemy target selection across the player and surviving allies
+- Team identification rings and ally status HUD
+- Kursk breakthrough objective: required kills plus any friendly entering the target zone
 - Multi-unit rendering, hostile projectile colour, battle HUD, victory and defeat panels
-- Unit tests for vehicles, campaigns, maps, movement, terrain, AI, waves, projectile collisions, visual feedback, armour, penetration, and rewards
+- Unit tests for vehicles, campaigns, maps, movement, terrain, AI, waves, formations, squad commands, projectile collisions, visual feedback, armour, penetration, and rewards
 - GitHub Actions test and debug APK build pipeline
 
 Next migration stages:
 
-1. Ally tanks, squad orders, and formation movement
-2. Power-ups and battlefield support skills
-3. Campaign, faction, garage, and briefing screens
-4. Original tank image assets and richer visual effects
-5. Audio system, save data, achievements, and progression
-6. Remaining historical scenarios
+1. Power-ups and battlefield support skills
+2. Campaign, faction, garage, and briefing screens
+3. Original tank image assets and richer visual effects
+4. Audio system, save data, achievements, and progression
+5. Remaining historical scenarios
+6. Touch-control polish and device adaptation
 
 ## Build
 
@@ -70,6 +76,7 @@ Every push to `main` is configured to run the unit tests, build a debug APK, and
 app/src/main/java/com/songtaoluo/battlecity/
 ├── MainActivity.kt
 ├── game/
+│   ├── AllyAiSystem.kt
 │   ├── BulletCollisionSystem.kt
 │   ├── CampaignCatalog.kt
 │   ├── CombatResolver.kt
@@ -92,5 +99,6 @@ app/src/main/java/com/songtaoluo/battlecity/
     ├── BattleContent.kt
     ├── BattlefieldCanvas.kt
     ├── BattleScreen.kt
-    └── ImpactEffectRenderer.kt
+    ├── ImpactEffectRenderer.kt
+    └── SquadControls.kt
 ```
