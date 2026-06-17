@@ -16,13 +16,14 @@ import kotlin.math.ceil
 @Composable
 internal fun SupportControls(
     engine: GameEngine,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = modifier) {
-        SupportButton(engine, SupportSkillType.ARTILLERY_BARRAGE, "炮击")
-        SupportButton(engine, SupportSkillType.RECON_FLARE, "侦察")
-        SupportButton(engine, SupportSkillType.EMERGENCY_REPAIR, "维修")
-        SupportButton(engine, SupportSkillType.SMOKE_SCREEN, "烟幕")
+        SupportButton(engine, SupportSkillType.ARTILLERY_BARRAGE, "炮击", enabled)
+        SupportButton(engine, SupportSkillType.RECON_FLARE, "侦察", enabled)
+        SupportButton(engine, SupportSkillType.EMERGENCY_REPAIR, "维修", enabled)
+        SupportButton(engine, SupportSkillType.SMOKE_SCREEN, "烟幕", enabled)
     }
 }
 
@@ -31,6 +32,7 @@ private fun SupportButton(
     engine: GameEngine,
     skill: SupportSkillType,
     label: String,
+    controlsEnabled: Boolean,
 ) {
     val selectingArtillery = skill == SupportSkillType.ARTILLERY_BARRAGE &&
         engine.targetingMode == TargetingMode.ARTILLERY
@@ -42,7 +44,7 @@ private fun SupportButton(
     }
     Button(
         onClick = { engine.useSupportSkill(skill) },
-        enabled = !selectingArtillery && engine.canUseSupportSkill(skill),
+        enabled = controlsEnabled && !selectingArtillery && engine.canUseSupportSkill(skill),
     ) {
         Text(label + suffix)
     }
