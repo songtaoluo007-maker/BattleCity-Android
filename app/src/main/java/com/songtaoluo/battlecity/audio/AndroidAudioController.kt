@@ -8,12 +8,6 @@ import android.media.SoundPool
 import android.media.ToneGenerator
 import java.io.Closeable
 
-/**
- * Android audio backend.
- *
- * Short effects use SoundPool for concurrent playback. Music uses exactly one
- * MediaPlayer, avoiding the AVPlayer pool/reset races found in the HarmonyOS source.
- */
 class AndroidAudioController(
     context: Context,
 ) : Closeable {
@@ -27,7 +21,8 @@ class AndroidAudioController(
 
     private var musicPlayer: MediaPlayer? = null
     private var currentMusicTheme: MusicTheme? = null
-    private var enabled = true
+    private var musicEnabled = true
+    private var effectsEnabled = true
     private var effectsVolume = 0.78f
     private var musicVolume = 0.72f
 
@@ -50,9 +45,13 @@ class AndroidAudioController(
         }.toMap()
     }
 
-    fun setEnabled(value: Boolean) {
-        enabled = value
+    fun setMusicEnabled(value: Boolean) {
+        musicEnabled = value
         if (!value) stopMusic()
+    }
+
+    fun setEffectsEnabled(value: Boolean) {
+        effectsEnabled = value
     }
 
     fun setEffectsVolume(value: Float) {
@@ -65,7 +64,7 @@ class AndroidAudioController(
     }
 
     fun play(cue: AudioCue) {
-        if (!enabled) return
+        if (!effectsEnabled) return
         val soundId = soundIds[cue]
         if (soundId != null && soundId in loadedSoundIds) {
             soundPool.play(soundId, effectsVolume, effectsVolume, 1, 0, 1f)
@@ -75,7 +74,7 @@ class AndroidAudioController(
     }
 
     fun switchMusic(theme: MusicTheme, loop: Boolean = true) {
-        if (!enabled || currentMusicTheme == theme) return
+        if (!musicEnabled || currentMusicTheme == theme) return
 
         stopMusic()
         val resourceId = resolveMusicResource(theme)
