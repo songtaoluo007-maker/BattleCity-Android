@@ -1,5 +1,6 @@
 package com.songtaoluo.battlecity.game
 
+import com.songtaoluo.battlecity.model.TeamSide
 import kotlin.math.sqrt
 
 data class BulletCollision(
@@ -17,7 +18,7 @@ object BulletCollisionSystem {
 
             for (secondIndex in firstIndex + 1 until bullets.size) {
                 val second = bullets[secondIndex]
-                if (!second.active || first.team == second.team) continue
+                if (!second.active || !isDifferentSide(first, second)) continue
 
                 val dx = first.position.x - second.position.x
                 val dy = first.position.y - second.position.y
@@ -37,5 +38,11 @@ object BulletCollisionSystem {
             }
         }
         return collisions
+    }
+
+    private fun isDifferentSide(first: Bullet, second: Bullet): Boolean {
+        val firstCategory = first.team == TeamSide.ENEMY
+        val secondCategory = second.team == TeamSide.ENEMY
+        return firstCategory != secondCategory
     }
 }
