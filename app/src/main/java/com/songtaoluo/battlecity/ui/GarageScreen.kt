@@ -27,7 +27,8 @@ import com.songtaoluo.battlecity.model.ScenarioData
 import com.songtaoluo.battlecity.model.VehicleId
 import com.songtaoluo.battlecity.model.VehicleSpec
 import com.songtaoluo.battlecity.ui.art.OriginalArtCatalog
-import com.songtaoluo.battlecity.ui.art.OriginalArtImage
+import com.songtaoluo.battlecity.ui.art.OriginalArtNames
+import com.songtaoluo.battlecity.ui.art.PreferredOriginalArtImage
 
 @Composable
 internal fun GarageScreen(
@@ -91,9 +92,14 @@ private fun VehicleCard(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(vehicle.displayName, color = if (owned) Color.White else Color(0xFF9A9C96), style = MaterialTheme.typography.titleMedium)
+            Text(
+                vehicle.displayName,
+                color = if (owned) Color.White else Color(0xFF9A9C96),
+                style = MaterialTheme.typography.titleMedium,
+            )
             Text(vehicle.role.wireValue, color = Color(0xFFFFD54F))
-            OriginalArtImage(
+            PreferredOriginalArtImage(
+                resourceStem = OriginalArtNames.vehicle(vehicle.id),
                 region = OriginalArtCatalog.vehicle(vehicle.id),
                 contentDescription = vehicle.displayName,
                 modifier = Modifier.fillMaxWidth().height(92.dp).background(Color(0xFF111411)),
