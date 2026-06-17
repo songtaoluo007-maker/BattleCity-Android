@@ -13,8 +13,8 @@ internal object EnemyAiController {
         deltaSeconds: Float,
         tiles: List<List<TileType>>,
         blockers: List<Tank>,
-        fire: (Tank) -> Unit,
         canSeeTarget: Boolean,
+        fire: (Tank) -> Unit,
     ) {
         if (!enemy.alive || !target.alive) return
 
