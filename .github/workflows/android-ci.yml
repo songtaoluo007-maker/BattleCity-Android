@@ -29,10 +29,27 @@ jobs:
           gradle-version: "8.9"
 
       - name: Run unit tests
-        run: gradle :app:testDebugUnitTest --stacktrace
+        shell: bash
+        run: |
+          set +e
+          gradle :app:testDebugUnitTest --stacktrace --console=plain 2>&1 | tee ci-test.log
+          status=${PIPESTATUS[0]}
+          exit "$status"
+
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BattleCity-Android-test-diagnostics
+          path: |
+            ci-test.log
+            app/build/test-results/**/*.xml
+            app/build/reports/tests/**
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+        run: gradle :app:assembleDebug --stacktrace --console=plain
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
