@@ -49,6 +49,7 @@ internal fun BattlefieldCanvas(engine: GameEngine, frame: Int, modifier: Modifie
                         center = Offset(bullet.position.x, bullet.position.y),
                     )
                 }
+                engine.effects.forEach { effect -> drawImpactEffect(effect) }
             }
         }
     }
