@@ -20,17 +20,22 @@ Implemented:
 - Both Kursk scenario definitions
 - Validated 17 x 17 HarmonyOS tile-map parser
 - Scaled Compose Canvas rendering for the Kursk battlefield
-- Unit tests for vehicles, campaign order, map parsing, armour, penetration, and rewards
+- Tank collision against brick, steel, base, and village tiles
+- Water terrain slowdown using the original 0.52 multiplier
+- Destructible brick and village terrain
+- Steel destruction for shells with at least 130 penetration
+- Projectile blocking, base impact reporting, and terrain score rewards
+- Unit tests for vehicles, campaigns, maps, movement, terrain, armour, penetration, and rewards
 - GitHub Actions test and debug APK build pipeline
 
 Next migration stages:
 
-1. Wall, water, forest, and tank collision
-2. Enemy AI and multiple active enemies
+1. Enemy AI, enemy fire, and multiple active enemies
+2. Tank-to-tank collision and crowd avoidance
 3. Campaign, faction, garage, and briefing screens
-4. Original tank image assets and effects
+4. Original tank image assets and visual effects
 5. Audio system, save data, achievements, and progression
-6. Complete scenario catalog
+6. Remaining historical scenarios
 
 ## Build
 
@@ -47,7 +52,7 @@ Open the repository in Android Studio and sync the Gradle project. For command-l
 gradle :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Every push to `main` runs the unit tests, builds a debug APK, and uploads `BattleCity-Android-debug` as a GitHub Actions artifact.
+Every push to `main` is configured to run the unit tests, build a debug APK, and upload `BattleCity-Android-debug` as a GitHub Actions artifact.
 
 ## Project structure
 
@@ -60,6 +65,8 @@ app/src/main/java/com/songtaoluo/battlecity/
 │   ├── GameConstants.kt
 │   ├── GameEngine.kt
 │   ├── GameModels.kt
+│   ├── MovementSystem.kt
+│   ├── ProjectileSystem.kt
 │   ├── ScenarioCatalog.kt
 │   ├── TileMapParser.kt
 │   └── VehicleCatalog.kt
