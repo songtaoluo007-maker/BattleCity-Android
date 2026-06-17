@@ -17,7 +17,7 @@ class AndroidSaveRepository(context: Context) {
     fun load(): SaveData {
         val defaults = SaveData(achievements = AchievementCatalog.defaultStates())
         val ownedVehicles = preferences.getStringSet(KEY_OWNED_VEHICLES, null)
-            ?.mapNotNull(VehicleId::fromWireValue)
+            ?.mapNotNull { value -> VehicleId.fromWireValue(value) }
             ?.toSet()
             .orEmpty()
             .ifEmpty { defaults.ownedVehicles }
@@ -71,11 +71,11 @@ class AndroidSaveRepository(context: Context) {
                 ownedVehicles = ownedVehicles,
                 completedScenarios = preferences.getStringSet(KEY_COMPLETED_SCENARIOS, emptySet())
                     .orEmpty()
-                    .filter(String::isNotBlank)
+                    .filter { it.isNotBlank() }
                     .toSet(),
                 completedCampaigns = preferences.getStringSet(KEY_COMPLETED_CAMPAIGNS, emptySet())
                     .orEmpty()
-                    .filter(String::isNotBlank)
+                    .filter { it.isNotBlank() }
                     .toSet(),
                 totalKills = totalKills,
                 totalPlayTimeSec = preferences.getLong(KEY_TOTAL_PLAY_TIME, 0L).coerceAtLeast(0L),
@@ -136,7 +136,7 @@ class AndroidSaveRepository(context: Context) {
 
     private fun decodeAchievements(raw: Set<String>): List<AchievementState> = raw.mapNotNull { encoded ->
         val parts = encoded.split(ACHIEVEMENT_SEPARATOR)
-        val id = parts.getOrNull(0)?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+        val id = parts.getOrNull(0)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         AchievementState(
             id = id,
             unlocked = parts.getOrNull(1) == "1",
