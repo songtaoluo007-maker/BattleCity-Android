@@ -1,104 +1,71 @@
 # BattleCity Android
 
-Android migration of the HarmonyOS `BattleCity_Deveco_Project_v3` project.
+Native Android migration and engineering rewrite of the HarmonyOS `BattleCity_Deveco_Project_v3` project, built with Kotlin, Jetpack Compose, and Compose Canvas.
 
-The original HarmonyOS repository remains unchanged. This repository is a native Android implementation using Kotlin, Jetpack Compose, and Compose Canvas.
+The original HarmonyOS repository remains unchanged. Historical scenarios, vehicles, and combat intent are preserved, while implementation details may be redesigned for Android reliability and maintainability.
 
-## Current migration status
+## Implemented
 
-Implemented:
+- Landscape Android game loop and scaled 17 x 17 battlefield renderer
+- Complete 24-vehicle catalog and six historical campaign definitions
+- Kursk scenarios, objectives, enemy budgets, and reinforcement waves
+- Armour-facing, penetration, ricochet, damage, score, credits, and command points
+- Swept movement that prevents wall tunnelling and approaches the last legal position
+- Terrain, tank-to-tank, water, mine, and broken-track movement rules
+- Destructible terrain and projectile-to-projectile collision
+- Enemy pursuit, visibility-gated fire, obstacle detours, and wall escape
+- Two ally tanks with follow, hold, assault, and focus-fire orders
+- Trailing-side formation safety so allies do not cross through the player after turns
+- Forest concealment, smoke concealment, recon reveal, and spotted-state rendering
+- Shield, speed, APCR, repair, and freeze supplies
+- Timed supply spawning, kill drops, and pity-drop guarantee
+- Collector-owned supply effects for player and allies
+- Artillery, recon, emergency repair, and smoke support skills
+- Command-point costs and per-skill cooldowns
+- Tactical-area, supply, shield, APCR, track-damage, hit, and destruction visuals
+- JVM unit tests and GitHub Actions test/APK pipeline
 
-- Native Android application module
-- Landscape full-screen activity
-- Frame-synchronised game loop with `withFrameNanos`
-- HarmonyOS core enums and domain types
-- Complete 24-vehicle catalog across German, Soviet, British, and American factions
-- Original vehicle speed, HP, reload, shell, penetration, armour, price, colour, and history data
-- Front, side, and rear armour resolution
-- Ricochet, blocked hit, reduced damage, destruction, score, and credit rewards
-- Six historical campaign definitions and unlock progression
-- Both Kursk scenario definitions
-- Validated 17 x 17 HarmonyOS tile-map parser
-- Scaled Compose Canvas rendering for the Kursk battlefield
-- Tank collision against brick, steel, base, and village tiles
-- Tank-to-tank collision and movement blocking
-- Water terrain slowdown using the original 0.52 multiplier
-- Destructible brick and village terrain
-- Steel destruction for shells with at least 130 penetration
-- Projectile blocking, base impact reporting, and terrain score rewards
-- Opposing projectile-to-projectile collision
-- Player and ally projectiles treated as the same side
-- Short-lived spark, hit-flash, and destruction visual feedback
-- Deterministic enemy pursuit with obstacle detours
-- Enemy line-of-fire checks and autonomous fire
-- Trapped enemy wall escape through destructible terrain
-- Scenario enemy budget, reinforcement timing, and five-unit active cap
-- Enemy damage against the player and mission failure state
-- Two scenario-defined ally tanks
-- Ally formation movement and autonomous fire
-- Follow, hold, assault, and focus-fire squad commands
-- Enemy target selection across the player and surviving allies
-- Team identification rings and ally status HUD
-- Kursk breakthrough objective: required kills plus any friendly entering the target zone
-- Multi-unit rendering, hostile projectile colour, battle HUD, victory and defeat panels
-- Unit tests for vehicles, campaigns, maps, movement, terrain, AI, waves, formations, squad commands, projectile collisions, visual feedback, armour, penetration, and rewards
-- GitHub Actions test and debug APK build pipeline
+Architecture and intentional improvements are documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-Next migration stages:
+## Next stages
 
-1. Power-ups and battlefield support skills
+1. Manual map targeting for artillery and focus-fire selection
 2. Campaign, faction, garage, and briefing screens
-3. Original tank image assets and richer visual effects
-4. Audio system, save data, achievements, and progression
-5. Remaining historical scenarios
+3. Original tank assets and richer effects
+4. Audio, save data, achievements, and progression
+5. Remaining scenarios and static battlefield units
 6. Touch-control polish and device adaptation
 
 ## Build
 
-Recommended environment:
-
-- Android Studio
-- JDK 17
-- Gradle 8.9
-- Android SDK 35
-
-Open the repository in Android Studio and sync the Gradle project. For command-line builds with Gradle installed:
+Recommended environment: Android Studio, JDK 17, Gradle 8.9, Android SDK 35.
 
 ```bash
 gradle :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Every push to `main` is configured to run the unit tests, build a debug APK, and upload `BattleCity-Android-debug` as a GitHub Actions artifact.
+Every push to `main` is configured to run unit tests, build a debug APK, and upload the `BattleCity-Android-debug` artifact.
 
-## Project structure
+## Main source layout
 
 ```text
 app/src/main/java/com/songtaoluo/battlecity/
-├── MainActivity.kt
 ├── game/
+│   ├── AllyAiController.kt
 │   ├── AllyAiSystem.kt
 │   ├── BulletCollisionSystem.kt
-│   ├── CampaignCatalog.kt
 │   ├── CombatResolver.kt
 │   ├── EnemyAiController.kt
 │   ├── EnemyAiSystem.kt
-│   ├── GameConstants.kt
 │   ├── GameEngine.kt
-│   ├── GameModels.kt
-│   ├── ImpactEffects.kt
 │   ├── MovementSystem.kt
+│   ├── PowerUpSystem.kt
 │   ├── ProjectileSystem.kt
-│   ├── ScenarioCatalog.kt
-│   ├── TileMapParser.kt
-│   └── VehicleCatalog.kt
+│   └── TacticalSystems.kt
 ├── model/
-│   ├── CampaignModels.kt
-│   ├── GameTypes.kt
-│   └── ScenarioModels.kt
 └── ui/
     ├── BattleContent.kt
     ├── BattlefieldCanvas.kt
-    ├── BattleScreen.kt
-    ├── ImpactEffectRenderer.kt
-    └── SquadControls.kt
+    ├── SquadControls.kt
+    └── SupportControls.kt
 ```
