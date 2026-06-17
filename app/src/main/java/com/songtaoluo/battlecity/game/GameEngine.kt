@@ -5,7 +5,6 @@ import com.songtaoluo.battlecity.model.HitResult
 import com.songtaoluo.battlecity.model.TankKind
 import com.songtaoluo.battlecity.model.TeamSide
 import com.songtaoluo.battlecity.model.VehicleId
-import com.songtaoluo.battlecity.model.VehicleRole
 import kotlin.math.abs
 
 class GameEngine {
@@ -111,39 +110,20 @@ class GameEngine {
     )
 
     private fun damageTank(target: Tank, bullet: Bullet): HitResult {
-        val armor = armorForHit(target, bullet.direction)
-
-        if (bullet.penetration < armor * GameConstants.PEN_RICOCHET_THRESHOLD) {
-            return HitResult.RICOCHET
+        val resolution = CombatResolver.resolve(target, bullet)
+        if (resolution.result == HitResult.RICOCHET || resolution.result == HitResult.BLOCKED) {
+            return resolution.result
         }
 
-        val damage = when {
-            bullet.penetration >= armor -> bullet.power
-            bullet.penetration + 18 >= armor -> 1
-            else -> 0
-        }
-
-        if (damage <= 0) return HitResult.BLOCKED
-
-        target.hp -= damage
+        target.hp -= resolution.damage
         if (target.hp > 0) return HitResult.HIT
 
         target.hp = 0
         target.alive = false
-        val reward = when (VehicleCatalog.get(target.vehicleId).role) {
-            VehicleRole.HEAVY -> GameConstants.HEAVY_KILL_REWARD
-            VehicleRole.SCOUT -> GameConstants.SCOUT_KILL_REWARD
-            else -> GameConstants.DEFAULT_KILL_REWARD
-        }
+        val reward = CombatResolver.rewardFor(target)
         score += reward
         credits += reward / 4
         return HitResult.DESTROY
-    }
-
-    private fun armorForHit(target: Tank, bulletDirection: Direction): Int = when {
-        bulletDirection == target.direction.opposite() -> target.armorFront
-        bulletDirection == target.direction -> target.armorRear
-        else -> target.armorSide
     }
 
     private fun intersects(bullet: Bullet, tank: Tank): Boolean {
