@@ -45,11 +45,14 @@ class GameEngine {
 
         input?.let { direction ->
             player.direction = direction
-            move(player, direction, player.speed * deltaSeconds)
+            val speed = MovementSystem.effectiveSpeed(player, tiles)
+            MovementSystem.tryMove(
+                tank = player,
+                direction = direction,
+                distance = speed * deltaSeconds,
+                tiles = tiles,
+            )
         }
-
-        clampToBoard(player)
-        clampToBoard(enemy)
 
         bullets.forEach { bullet ->
             moveBullet(bullet, deltaSeconds)
@@ -143,12 +146,6 @@ class GameEngine {
             abs(bullet.position.y - tank.position.y) <= hitRadius
     }
 
-    private fun clampToBoard(tank: Tank) {
-        val margin = GameConstants.TANK_SIZE / 2f + 2f
-        tank.position.x = tank.position.x.coerceIn(margin, GameConstants.BOARD_SIZE - margin)
-        tank.position.y = tank.position.y.coerceIn(margin, GameConstants.BOARD_SIZE - margin)
-    }
-
     private fun moveBullet(bullet: Bullet, deltaSeconds: Float) {
         val distance = bullet.speed * deltaSeconds
         when (bullet.direction) {
@@ -156,15 +153,6 @@ class GameEngine {
             Direction.DOWN -> bullet.position.y += distance
             Direction.LEFT -> bullet.position.x -= distance
             Direction.RIGHT -> bullet.position.x += distance
-        }
-    }
-
-    private fun move(tank: Tank, direction: Direction, distance: Float) {
-        when (direction) {
-            Direction.UP -> tank.position.y -= distance
-            Direction.DOWN -> tank.position.y += distance
-            Direction.LEFT -> tank.position.x -= distance
-            Direction.RIGHT -> tank.position.x += distance
         }
     }
 }
