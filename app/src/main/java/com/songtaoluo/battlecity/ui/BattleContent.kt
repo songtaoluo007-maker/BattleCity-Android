@@ -1,6 +1,7 @@
 package com.songtaoluo.battlecity.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.audio.AndroidAudioController
 import com.songtaoluo.battlecity.audio.AudioCue
@@ -111,10 +113,12 @@ internal fun BattleContent(
         SquadControls(
             current = engine.squadOrder,
             onChange = engine::setSquadOrder,
+            enabled = controlsEnabled,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
         )
         SupportControls(
             engine = engine,
+            enabled = controlsEnabled,
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 18.dp),
         )
         Button(
@@ -125,28 +129,43 @@ internal fun BattleContent(
         ) { Text("FIRE") }
         OutlinedButton(
             onClick = { paused = true },
-            enabled = !paused && !engine.victory && !engine.gameOver,
+            enabled = controlsEnabled,
             modifier = Modifier.align(Alignment.TopEnd).padding(14.dp),
         ) { Text("暂停") }
-        if (engine.targetingMode != TargetingMode.NONE && !paused) {
+        if (engine.targetingMode != TargetingMode.NONE && controlsEnabled) {
             TargetingPrompt(engine, Modifier.align(Alignment.TopStart).padding(16.dp))
         }
         if (paused && !engine.victory && !engine.gameOver) {
-            PausePanel(
-                onResume = { paused = false },
-                onRestart = onRestart,
-                onExit = onExit,
-                modifier = Modifier.align(Alignment.Center),
-            )
+            BlockingOverlay {
+                PausePanel(
+                    onResume = { paused = false },
+                    onRestart = onRestart,
+                    onExit = onExit,
+                )
+            }
         }
         if (engine.victory || engine.gameOver) {
-            ResultPanel(
-                engine = engine,
-                onRestart = onRestart,
-                onExit = onExit,
-                modifier = Modifier.align(Alignment.Center),
-            )
+            BlockingOverlay {
+                ResultPanel(
+                    engine = engine,
+                    onRestart = onRestart,
+                    onExit = onExit,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun BlockingOverlay(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0x99000000))
+            .pointerInput(Unit) { detectTapGestures(onTap = {}) },
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 
@@ -188,12 +207,11 @@ private fun PausePanel(
     onResume: () -> Unit,
     onRestart: () -> Unit,
     onExit: () -> Unit,
-    modifier: Modifier,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = modifier.background(Color(0xEE111111)).padding(28.dp),
+        modifier = Modifier.background(Color(0xEE111111)).padding(28.dp),
     ) {
         Text("战斗暂停", color = Color.White, style = MaterialTheme.typography.headlineMedium)
         Button(onClick = onResume) { Text("继续作战") }
@@ -246,12 +264,11 @@ private fun ResultPanel(
     engine: GameEngine,
     onRestart: () -> Unit,
     onExit: () -> Unit,
-    modifier: Modifier,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier.background(Color(0xEE111111)).padding(28.dp),
+        modifier = Modifier.background(Color(0xEE111111)).padding(28.dp),
     ) {
         Text(
             if (engine.victory) "任务完成" else "任务失败",
