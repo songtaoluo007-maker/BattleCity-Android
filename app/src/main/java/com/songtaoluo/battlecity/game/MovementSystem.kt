@@ -2,6 +2,7 @@ package com.songtaoluo.battlecity.game
 
 import com.songtaoluo.battlecity.model.Direction
 import com.songtaoluo.battlecity.model.TileType
+import kotlin.math.abs
 import kotlin.math.floor
 
 object MovementSystem {
@@ -10,6 +11,7 @@ object MovementSystem {
         direction: Direction,
         distance: Float,
         tiles: List<List<TileType>>,
+        blockers: List<Tank> = emptyList(),
     ): Boolean {
         if (!tank.alive || distance <= 0f) return false
 
@@ -24,10 +26,20 @@ object MovementSystem {
         }
         clampToBoard(tank)
 
-        if (collidesWithSolid(tank, tiles)) {
+        val blockedByTerrain = collidesWithSolid(tank, tiles)
+        val blockedByTank = blockers.any { other ->
+            other.id != tank.id && other.alive && overlaps(tank, other)
+        }
+        if (blockedByTerrain || blockedByTank) {
             tank.position.x = oldX
             tank.position.y = oldY
+            tank.blockedMs = GameConstants.AI_BLOCKED_MS
+            tank.blockedDirection = direction
             return false
+        }
+
+        if (tank.blockedDirection != direction) {
+            tank.blockedMs = (tank.blockedMs - 80f).coerceAtLeast(0f)
         }
         return tank.position.x != oldX || tank.position.y != oldY
     }
@@ -70,6 +82,12 @@ object MovementSystem {
             }
         }
         return false
+    }
+
+    fun overlaps(a: Tank, b: Tank, clearance: Float = GameConstants.TANK_MIN_SPACING): Boolean {
+        val minimumDistance = GameConstants.TANK_SIZE + clearance
+        return abs(a.position.x - b.position.x) < minimumDistance &&
+            abs(a.position.y - b.position.y) < minimumDistance
     }
 
     fun clampToBoard(tank: Tank) {
