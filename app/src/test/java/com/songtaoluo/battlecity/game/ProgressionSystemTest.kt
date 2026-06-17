@@ -44,10 +44,21 @@ class ProgressionSystemTest {
         assertEquals(4200, settled.bestScore)
         assertEquals(8, settled.playerProfile.bestOneMatchKills)
         assertTrue("kursk-1943-german-breakthrough" in settled.completedScenarios)
-        assertTrue("kursk-1943" in settled.completedCampaigns)
+        assertTrue(settled.completedCampaigns.isEmpty())
         assertTrue(settled.achievements.first { it.id == "ace_gold_8" }.unlocked)
         assertFalse(settled.achievements.first { it.id == "ace_platinum_12" }.unlocked)
         assertEquals(AchievementCatalog.ACE_TITLE, settled.playerProfile.title)
+    }
+
+    @Test
+    fun campaignCompletionIsExplicitAndIdempotent() {
+        val first = ProgressionSystem.markCampaignCompleted(
+            SaveData(achievements = AchievementCatalog.defaultStates()),
+            "kursk-1943",
+        )
+        val second = ProgressionSystem.markCampaignCompleted(first, "kursk-1943")
+
+        assertEquals(setOf("kursk-1943"), second.completedCampaigns)
     }
 
     @Test
