@@ -21,6 +21,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.game.GameEngine
+import com.songtaoluo.battlecity.ui.art.OriginalArtCatalog
+import com.songtaoluo.battlecity.ui.art.OriginalArtNames
+import com.songtaoluo.battlecity.ui.art.PreferredOriginalArtImage
 
 @Composable
 internal fun ResultArchivePanel(
@@ -32,11 +35,11 @@ internal fun ResultArchivePanel(
         modifier = Modifier.width(520.dp).height(360.dp),
         contentAlignment = Alignment.Center,
     ) {
-        OriginalArtImage(
-            stem = OriginalArt.resultStem(engine.victory),
+        PreferredOriginalArtImage(
+            resourceStem = OriginalArtNames.result(engine.victory),
+            region = OriginalArtCatalog.result(engine.victory),
             contentDescription = "作战结算背景",
             contentScale = ContentScale.Crop,
-            fallbackLabel = if (engine.victory) "VICTORY" else "MISSION END",
             modifier = Modifier.matchParentSize(),
         )
         Column(
