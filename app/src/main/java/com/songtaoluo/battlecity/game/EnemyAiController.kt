@@ -14,14 +14,13 @@ internal object EnemyAiController {
         tiles: List<List<TileType>>,
         blockers: List<Tank>,
         fire: (Tank) -> Unit,
+        canSeeTarget: Boolean,
     ) {
         if (!enemy.alive || !target.alive) return
 
-        enemy.aiTimerMs = (enemy.aiTimerMs - deltaSeconds * 1000f).coerceAtLeast(0f)
-        enemy.blockedMs = (enemy.blockedMs - deltaSeconds * 1000f).coerceAtLeast(0f)
-
         val firingDirection = firingDirection(enemy, target)
-        if (firingDirection != null &&
+        if (canSeeTarget &&
+            firingDirection != null &&
             distanceBetween(enemy, target) <= enemy.visionRange &&
             hasClearLineOfFire(enemy, target, tiles)
         ) {
