@@ -80,8 +80,10 @@ class GameEngine(
     var baseDestroyed: Boolean = false
         private set
 
-    var battleElapsedMs: Long = 0L
-        private set
+    private val battleClock = BattleClock()
+
+    val battleElapsedMs: Long
+        get() = battleClock.elapsedMs
 
     var lastHitResult: HitResult? = null
         private set
@@ -139,7 +141,7 @@ class GameEngine(
             return
         }
 
-        battleElapsedMs += (deltaSeconds.coerceAtLeast(0f) * 1000f).toLong()
+        battleClock.advance(deltaSeconds)
         allTanks().forEach { tank -> TankStatusSystem.update(tank, deltaSeconds) }
         updatePlayer(input, deltaSeconds)
         updateSpotting()
