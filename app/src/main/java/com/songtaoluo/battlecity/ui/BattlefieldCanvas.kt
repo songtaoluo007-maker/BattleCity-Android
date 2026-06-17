@@ -9,6 +9,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import com.songtaoluo.battlecity.game.GameConstants
@@ -41,6 +42,7 @@ internal fun BattlefieldCanvas(engine: GameEngine, frame: Int, modifier: Modifie
                     values.forEachIndexed { column, tile -> drawBattleTile(tile, column, row) }
                 }
                 if (engine.player.alive) drawTank(engine.player)
+                engine.allies.filter { it.alive }.forEach { drawTank(it) }
                 engine.enemies.filter { it.alive }.forEach { drawTank(it) }
                 engine.bullets.forEach { bullet ->
                     drawCircle(
@@ -74,7 +76,7 @@ private fun DrawScope.drawBattleTile(tile: TileType, column: Int, row: Int) {
         color = Color(0x22000000),
         topLeft = topLeft,
         size = Size(tileSize, tileSize),
-        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1f),
+        style = Stroke(width = 1f),
     )
     when (tile) {
         TileType.WATER -> {
@@ -94,7 +96,18 @@ private fun DrawScope.drawTank(tank: Tank) {
     val trim = Color(AndroidColor.parseColor(spec.trimColor))
     val center = Offset(tank.position.x, tank.position.y)
     val half = GameConstants.TANK_SIZE / 2f
+    val teamColor = when (tank.team) {
+        TeamSide.PLAYER -> Color(0xFF42A5F5)
+        TeamSide.ALLY -> Color(0xFF4DD0E1)
+        TeamSide.ENEMY -> Color(0xFFEF5350)
+    }
 
+    drawCircle(
+        color = teamColor,
+        radius = half + 4f,
+        center = center,
+        style = Stroke(width = 2f),
+    )
     drawRect(
         dark,
         Offset(center.x - half - 3f, center.y - half),
