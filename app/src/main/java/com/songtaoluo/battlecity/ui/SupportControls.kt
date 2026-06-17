@@ -1,0 +1,42 @@
+package com.songtaoluo.battlecity.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.songtaoluo.battlecity.game.GameEngine
+import com.songtaoluo.battlecity.game.SupportSkillSystem
+import com.songtaoluo.battlecity.model.SupportSkillType
+import kotlin.math.ceil
+
+@Composable
+internal fun SupportControls(
+    engine: GameEngine,
+    modifier: Modifier = Modifier,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = modifier) {
+        SupportButton(engine, SupportSkillType.ARTILLERY_BARRAGE, "炮击")
+        SupportButton(engine, SupportSkillType.RECON_FLARE, "侦察")
+        SupportButton(engine, SupportSkillType.EMERGENCY_REPAIR, "维修")
+        SupportButton(engine, SupportSkillType.SMOKE_SCREEN, "烟幕")
+    }
+}
+
+@Composable
+private fun SupportButton(
+    engine: GameEngine,
+    skill: SupportSkillType,
+    label: String,
+) {
+    val cooldownSeconds = ceil(engine.supportCooldownMs(skill) / 1000f).toInt()
+    val suffix = if (cooldownSeconds > 0) " ${cooldownSeconds}s" else " ${SupportSkillSystem.cost(skill)}点"
+    Button(
+        onClick = { engine.useSupportSkill(skill) },
+        enabled = engine.canUseSupportSkill(skill),
+    ) {
+        Text(label + suffix)
+    }
+}
