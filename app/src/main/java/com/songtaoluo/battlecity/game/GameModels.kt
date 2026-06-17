@@ -2,6 +2,7 @@ package com.songtaoluo.battlecity.game
 
 import com.songtaoluo.battlecity.model.Direction
 import com.songtaoluo.battlecity.model.Faction
+import com.songtaoluo.battlecity.model.PowerUpType
 import com.songtaoluo.battlecity.model.TankKind
 import com.songtaoluo.battlecity.model.TeamSide
 import com.songtaoluo.battlecity.model.VehicleId
@@ -33,6 +34,11 @@ data class Tank(
     var aiTimerMs: Float = 0f,
     var blockedMs: Float = 0f,
     var blockedDirection: Direction? = null,
+    var shieldMs: Float = 0f,
+    var trackBrokenMs: Float = 0f,
+    var speedBoostMs: Float = 0f,
+    var apcrShots: Int = 0,
+    var isSpotted: Boolean = team != TeamSide.ENEMY,
     var alive: Boolean = true,
 )
 
@@ -46,6 +52,13 @@ data class Bullet(
     val power: Int,
     val penetration: Int,
     var active: Boolean = true,
+)
+
+data class PowerUp(
+    val type: PowerUpType,
+    val position: Vec2,
+    var ttlMs: Float = GameConstants.POWER_UP_TTL_MS,
+    val size: Float = GameConstants.POWER_UP_SIZE,
 )
 
 fun VehicleSpec.createTank(
@@ -74,4 +87,5 @@ fun VehicleSpec.createTank(
     armorRear = armorRear,
     visionRange = visionRange,
     scoutReveal = scoutReveal,
+    isSpotted = team != TeamSide.ENEMY,
 )
