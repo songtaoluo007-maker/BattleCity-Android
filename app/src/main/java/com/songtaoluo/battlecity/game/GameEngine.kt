@@ -3,6 +3,7 @@ package com.songtaoluo.battlecity.game
 import com.songtaoluo.battlecity.model.Direction
 import com.songtaoluo.battlecity.model.GridPoint
 import com.songtaoluo.battlecity.model.HitResult
+import com.songtaoluo.battlecity.model.ObjectiveType
 import com.songtaoluo.battlecity.model.PowerUpType
 import com.songtaoluo.battlecity.model.ScenarioData
 import com.songtaoluo.battlecity.model.SquadOrder
@@ -76,6 +77,12 @@ class GameEngine(
     var gameOver: Boolean = false
         private set
 
+    var baseDestroyed: Boolean = false
+        private set
+
+    var battleElapsedMs: Long = 0L
+        private set
+
     var lastHitResult: HitResult? = null
         private set
 
@@ -105,6 +112,9 @@ class GameEngine(
     val alliesAlive: Int
         get() = allies.count { it.alive }
 
+    val objectiveRemainingMs: Long
+        get() = (scenario.objective.holdMs - battleElapsedMs).coerceAtLeast(0L)
+
     val selectedFocusTarget: Tank?
         get() = selectedFocusTargetId?.let { id ->
             enemies.firstOrNull { it.id == id && it.alive && it.isSpotted }
@@ -129,6 +139,7 @@ class GameEngine(
             return
         }
 
+        battleElapsedMs += (deltaSeconds.coerceAtLeast(0f) * 1000f).toLong()
         allTanks().forEach { tank -> TankStatusSystem.update(tank, deltaSeconds) }
         updatePlayer(input, deltaSeconds)
         updateSpotting()
@@ -363,7 +374,11 @@ class GameEngine(
                 effects += ImpactEffectSystem.spark(bullet.position)
                 if (bullet.team != TeamSide.ENEMY) score += impact.scoreDelta
                 combatMessage = when {
-                    impact.baseHit -> "阵地基地遭到炮击"
+                    impact.baseHit && bullet.team == TeamSide.ENEMY -> {
+                        baseDestroyed = true
+                        "阵地基地被敌军摧毁"
+                    }
+                    impact.baseHit -> "友军炮弹命中基地工事"
                     impact.destroyedTile -> "障碍物已摧毁"
                     else -> "炮弹被装甲工事拦截"
                 }
@@ -696,28 +711,50 @@ class GameEngine(
     }
 
     private fun updateObjectiveState() {
-        if (!player.alive) {
-            gameOver = true
-            targetingMode = TargetingMode.NONE
-            return
-        }
-
-        val objectiveCenter = gridToPosition(
-            GridPoint(scenario.objective.targetX, scenario.objective.targetY),
+        val evaluation = ObjectiveSystem.evaluate(
+            objective = scenario.objective,
+            elapsedMs = battleElapsedMs,
+            destroyedEnemies = destroyedEnemies,
+            friendlies = friendlyTanks(),
+            targetCenter = gridToPosition(
+                GridPoint(scenario.objective.targetX, scenario.objective.targetY),
+            ),
+            playerAlive = player.alive,
+            baseDestroyed = baseDestroyed,
         )
-        val friendlyInsideObjective = friendlyTanks().any { friendly ->
-            distance(friendly.position, objectiveCenter) <= scenario.objective.radius
-        }
-        val killsComplete = destroyedEnemies >= scenario.objective.requiredKills
 
-        if (killsComplete && friendlyInsideObjective) {
-            victory = true
-            targetingMode = TargetingMode.NONE
-            score += 1000
-            credits += 420
-            combatMessage = "突破完成：北部防线已被撕开"
-        } else if (killsComplete) {
-            combatMessage = "击毁目标已完成，让任意友军进入北部红色目标区"
+        when (evaluation.outcome) {
+            ObjectiveOutcome.DEFEAT -> {
+                gameOver = true
+                targetingMode = TargetingMode.NONE
+                combatMessage = if (baseDestroyed) {
+                    "阵地基地失守，任务失败"
+                } else {
+                    "座车被击毁，任务失败"
+                }
+            }
+            ObjectiveOutcome.VICTORY -> {
+                victory = true
+                targetingMode = TargetingMode.NONE
+                score += 1000
+                credits += 420
+                combatMessage = when (scenario.objective.type) {
+                    ObjectiveType.BREAKTHROUGH -> "突破完成：北部防线已被撕开"
+                    ObjectiveType.SURVIVE,
+                    ObjectiveType.DEFEND,
+                    -> if (evaluation.timeComplete) {
+                        "坚守成功：敌军攻势已被拖垮"
+                    } else {
+                        "防御成功：敌军装甲攻势已被粉碎"
+                    }
+                    ObjectiveType.DESTROY -> "歼灭任务完成"
+                }
+            }
+            ObjectiveOutcome.ACTIVE -> {
+                if (scenario.objective.type == ObjectiveType.BREAKTHROUGH && evaluation.killsComplete) {
+                    combatMessage = "击毁目标已完成，让任意友军进入北部红色目标区"
+                }
+            }
         }
     }
 
@@ -755,9 +792,9 @@ class GameEngine(
         }
     }
 
-    private fun distance(a: Vec2, b: Vec2): Float {
-        val dx = a.x - b.x
-        val dy = a.y - b.y
+    private fun distance(first: Vec2, second: Vec2): Float {
+        val dx = first.x - second.x
+        val dy = first.y - second.y
         return sqrt(dx * dx + dy * dy)
     }
 }
