@@ -20,6 +20,21 @@ class AppFlowTest {
     }
 
     @Test
+    fun profileAndSettingsReturnToCampaignWithoutClearingSelection() {
+        val selected = AppFlowState()
+            .selectCampaign("kursk-1943")
+            .selectScenario("kursk-1943-german-breakthrough", VehicleId.PZ_IV_H)
+
+        val profile = selected.showProfile().back()
+        val settings = selected.showSettings().back()
+
+        assertEquals(AppStage.CAMPAIGN, profile.stage)
+        assertEquals(AppStage.CAMPAIGN, settings.stage)
+        assertEquals("kursk-1943", profile.campaignId)
+        assertEquals(selected.scenarioId, settings.scenarioId)
+    }
+
+    @Test
     fun newCampaignClearsScenarioAndVehicle() {
         val state = AppFlowState(
             stage = AppStage.BRIEFING,

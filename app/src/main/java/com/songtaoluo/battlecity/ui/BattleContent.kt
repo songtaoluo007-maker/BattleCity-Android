@@ -31,6 +31,7 @@ import com.songtaoluo.battlecity.audio.MusicThemeResolver
 import com.songtaoluo.battlecity.game.GameEngine
 import com.songtaoluo.battlecity.game.TargetingMode
 import com.songtaoluo.battlecity.game.VehicleCatalog
+import com.songtaoluo.battlecity.model.BattleSummary
 import com.songtaoluo.battlecity.model.Direction
 import kotlinx.coroutines.isActive
 import kotlin.math.ceil
@@ -38,11 +39,16 @@ import kotlin.math.ceil
 @Composable
 internal fun BattleContent(
     engine: GameEngine,
+    campaignId: String,
     audioController: AndroidAudioController,
+    onRestart: () -> Unit,
     onExit: () -> Unit,
+    onFinished: (BattleSummary) -> Unit,
 ) {
     var direction by remember(engine) { mutableStateOf<Direction?>(null) }
     var frame by remember(engine) { mutableIntStateOf(0) }
+    var paused by remember(engine) { mutableStateOf(false) }
+    var settled by remember(engine) { mutableStateOf(false) }
     val audioObserver = remember(engine) { BattleAudioObserver() }
 
     LaunchedEffect(engine, audioController, audioObserver) {
@@ -52,7 +58,9 @@ internal fun BattleContent(
             withFrameNanos { now ->
                 if (previous != 0L) {
                     val delta = ((now - previous) / 1_000_000_000f).coerceAtMost(0.05f)
-                    engine.update(delta, direction)
+                    if (!paused && !engine.victory && !engine.gameOver) {
+                        engine.update(delta, direction)
+                    }
                     audioObserver.collect(engine).forEach { cue ->
                         when (cue) {
                             AudioCue.VICTORY -> audioController.switchMusic(
@@ -64,6 +72,21 @@ internal fun BattleContent(
                             else -> audioController.play(cue)
                         }
                     }
+                    if ((engine.victory || engine.gameOver) && !settled) {
+                        settled = true
+                        direction = null
+                        onFinished(
+                            BattleSummary(
+                                scenarioId = engine.scenario.id,
+                                campaignId = campaignId,
+                                victory = engine.victory,
+                                score = engine.score,
+                                destroyedEnemies = engine.destroyedEnemies,
+                                elapsedSeconds = engine.battleElapsedMs / 1000L,
+                                earnedCredits = (engine.credits - 1600).coerceAtLeast(0),
+                            ),
+                        )
+                    }
                     frame++
                 }
                 previous = now
@@ -71,16 +94,18 @@ internal fun BattleContent(
         }
     }
 
-    LaunchedEffect(engine.targetingMode) {
-        if (engine.targetingMode != TargetingMode.NONE) direction = null
+    LaunchedEffect(engine.targetingMode, paused) {
+        if (engine.targetingMode != TargetingMode.NONE || paused) direction = null
     }
+
+    val controlsEnabled = !paused && !engine.victory && !engine.gameOver
 
     Box(Modifier.fillMaxSize().background(Color(0xFF10150F))) {
         BattlefieldCanvas(engine, frame, Modifier.fillMaxSize())
         BattleHud(engine, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
         DirectionPad(
             onDirection = { direction = it },
-            enabled = engine.targetingMode == TargetingMode.NONE,
+            enabled = controlsEnabled && engine.targetingMode == TargetingMode.NONE,
             modifier = Modifier.align(Alignment.BottomStart).padding(20.dp),
         )
         SquadControls(
@@ -94,20 +119,33 @@ internal fun BattleContent(
         )
         Button(
             onClick = engine::fire,
-            enabled = engine.player.alive &&
-                !engine.victory &&
+            enabled = controlsEnabled && engine.player.alive &&
                 engine.targetingMode == TargetingMode.NONE,
             modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp).size(112.dp, 58.dp),
         ) { Text("FIRE") }
         OutlinedButton(
-            onClick = onExit,
+            onClick = { paused = true },
+            enabled = !paused && !engine.victory && !engine.gameOver,
             modifier = Modifier.align(Alignment.TopEnd).padding(14.dp),
-        ) { Text("退出战斗") }
-        if (engine.targetingMode != TargetingMode.NONE) {
+        ) { Text("暂停") }
+        if (engine.targetingMode != TargetingMode.NONE && !paused) {
             TargetingPrompt(engine, Modifier.align(Alignment.TopStart).padding(16.dp))
         }
+        if (paused && !engine.victory && !engine.gameOver) {
+            PausePanel(
+                onResume = { paused = false },
+                onRestart = onRestart,
+                onExit = onExit,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
         if (engine.victory || engine.gameOver) {
-            ResultPanel(engine, onExit, Modifier.align(Alignment.Center))
+            ResultPanel(
+                engine = engine,
+                onRestart = onRestart,
+                onExit = onExit,
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
     }
 }
@@ -131,7 +169,7 @@ private fun BattleHud(engine: GameEngine, modifier: Modifier) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Text(engine.scenario.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
         Text(
-            "SCORE ${engine.score}  军费 ${engine.credits}  指挥点 ${engine.commandPoints}  " +
+            "SCORE ${engine.score}  本局军费 ${engine.credits}  指挥点 ${engine.commandPoints}  " +
                 "战果 ${engine.destroyedEnemies}/${engine.scenario.objective.requiredKills}$timerText",
             color = Color(0xFFE8D9A7),
         )
@@ -142,6 +180,25 @@ private fun BattleHud(engine: GameEngine, modifier: Modifier) {
             color = Color(0xFFD8D0A8),
         )
         Text(engine.combatMessage, color = Color(0xFFFFE082))
+    }
+}
+
+@Composable
+private fun PausePanel(
+    onResume: () -> Unit,
+    onRestart: () -> Unit,
+    onExit: () -> Unit,
+    modifier: Modifier,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier.background(Color(0xEE111111)).padding(28.dp),
+    ) {
+        Text("战斗暂停", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+        Button(onClick = onResume) { Text("继续作战") }
+        OutlinedButton(onClick = onRestart) { Text("重新开始") }
+        OutlinedButton(onClick = onExit) { Text("退出到简报") }
     }
 }
 
@@ -185,11 +242,16 @@ private fun DirectionPad(
 }
 
 @Composable
-private fun ResultPanel(engine: GameEngine, onExit: () -> Unit, modifier: Modifier) {
+private fun ResultPanel(
+    engine: GameEngine,
+    onRestart: () -> Unit,
+    onExit: () -> Unit,
+    modifier: Modifier,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier.background(Color(0xDD111111)).padding(28.dp),
+        modifier = modifier.background(Color(0xEE111111)).padding(28.dp),
     ) {
         Text(
             if (engine.victory) "任务完成" else "任务失败",
@@ -200,6 +262,13 @@ private fun ResultPanel(engine: GameEngine, onExit: () -> Unit, modifier: Modifi
             "战果 ${engine.destroyedEnemies}  友军存活 ${engine.alliesAlive}  得分 ${engine.score}",
             color = Color.White,
         )
-        Button(onClick = onExit) { Text("返回作战简报") }
+        Text(
+            "本局获得军费 ${(engine.credits - 1600).coerceAtLeast(0)}",
+            color = Color(0xFFE8D9A7),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = onRestart) { Text("再次作战") }
+            OutlinedButton(onClick = onExit) { Text("返回作战简报") }
+        }
     }
 }
