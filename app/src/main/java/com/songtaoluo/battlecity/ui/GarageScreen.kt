@@ -30,47 +30,82 @@ import com.songtaoluo.battlecity.model.VehicleSpec
 internal fun GarageScreen(
     scenario: ScenarioData,
     selectedVehicleId: VehicleId?,
+    credits: Int,
+    ownedVehicles: Set<VehicleId>,
     onBack: () -> Unit,
     onSelect: (VehicleId) -> Unit,
+    onPurchase: (VehicleId) -> Unit,
     onContinue: () -> Unit,
 ) {
     val vehicles = scenario.allyVehicles.map(VehicleCatalog::get)
+    val selectedIsOwned = selectedVehicleId != null && selectedVehicleId in ownedVehicles
+
     FrontEndLayout {
         Text("装甲车库", color = Color.White, style = MaterialTheme.typography.headlineMedium)
         Text("${scenario.faction.displayName} · ${scenario.operation}", color = Color(0xFFFFD54F))
-        Spacer(Modifier.height(16.dp))
+        Text("可用军费 $credits", color = Color(0xFFE8D9A7))
+        Spacer(Modifier.height(12.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             items(vehicles, key = { it.id }) { vehicle ->
-                VehicleCard(vehicle, selectedVehicleId == vehicle.id, onSelect)
+                VehicleCard(
+                    vehicle = vehicle,
+                    selected = selectedVehicleId == vehicle.id,
+                    owned = vehicle.id in ownedVehicles,
+                    credits = credits,
+                    onSelect = onSelect,
+                    onPurchase = onPurchase,
+                )
             }
         }
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = onBack) { Text("返回阵营") }
-            Button(onClick = onContinue, enabled = selectedVehicleId != null) { Text("进入作战简报") }
+            Button(onClick = onContinue, enabled = selectedIsOwned) { Text("进入作战简报") }
         }
     }
 }
 
 @Composable
-private fun VehicleCard(vehicle: VehicleSpec, selected: Boolean, onSelect: (VehicleId) -> Unit) {
+private fun VehicleCard(
+    vehicle: VehicleSpec,
+    selected: Boolean,
+    owned: Boolean,
+    credits: Int,
+    onSelect: (VehicleId) -> Unit,
+    onPurchase: (VehicleId) -> Unit,
+) {
     Card(
-        modifier = Modifier.width(290.dp).height(270.dp),
+        modifier = Modifier.width(290.dp).height(290.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) Color(0xFF344233) else Color(0xEE1A1F1A),
+            containerColor = when {
+                selected && owned -> Color(0xFF344233)
+                owned -> Color(0xEE1A1F1A)
+                else -> Color(0xEE20201E)
+            },
         ),
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(vehicle.displayName, color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Text(vehicle.displayName, color = if (owned) Color.White else Color(0xFF9A9C96), style = MaterialTheme.typography.titleMedium)
             Text(vehicle.role.wireValue, color = Color(0xFFFFD54F))
             Text(vehicle.history, color = Color(0xFFD6D8D1), modifier = Modifier.weight(1f))
             Text("HP ${vehicle.hp}  速度 ${vehicle.speed.toInt()}  穿深 ${vehicle.penetration}", color = Color(0xFFB8BCAE))
             Text("装甲 ${vehicle.armorFront}/${vehicle.armorSide}/${vehicle.armorRear}", color = Color(0xFFB8BCAE))
-            Button(onClick = { onSelect(vehicle.id) }, modifier = Modifier.fillMaxWidth()) {
-                Text(if (selected) "已选择" else "选择车辆")
+            if (owned) {
+                Button(onClick = { onSelect(vehicle.id) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (selected) "已选择" else "选择车辆")
+                }
+            } else {
+                Text("未解锁 · 价格 ${vehicle.price}", color = Color(0xFFFFAB91))
+                Button(
+                    onClick = { onPurchase(vehicle.id) },
+                    enabled = credits >= vehicle.price,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (credits >= vehicle.price) "购买车辆" else "军费不足")
+                }
             }
         }
     }
