@@ -10,7 +10,9 @@ import kotlin.math.abs
 
 class GameEngine {
     val scenario = ScenarioCatalog.kurskGermanBreakthrough
-    val tiles: List<List<TileType>> = TileMapParser.parse(scenario.map)
+    val tiles: MutableList<MutableList<TileType>> = TileMapParser.parse(scenario.map)
+        .map { it.toMutableList() }
+        .toMutableList()
 
     private val playerVehicle = VehicleCatalog.get(scenario.allyVehicles.first())
     private val enemyVehicle = VehicleCatalog.get(scenario.enemyVehicles.first())
@@ -46,12 +48,7 @@ class GameEngine {
         input?.let { direction ->
             player.direction = direction
             val speed = MovementSystem.effectiveSpeed(player, tiles)
-            MovementSystem.tryMove(
-                tank = player,
-                direction = direction,
-                distance = speed * deltaSeconds,
-                tiles = tiles,
-            )
+            MovementSystem.tryMove(player, direction, speed * deltaSeconds, tiles)
         }
 
         bullets.forEach { bullet ->
@@ -61,6 +58,19 @@ class GameEngine {
                 bullet.position.y !in 0f..GameConstants.BOARD_SIZE
             ) {
                 bullet.active = false
+            }
+
+            if (bullet.active) {
+                val impact = ProjectileSystem.resolveTileImpact(bullet, tiles)
+                if (impact.consumed) {
+                    bullet.active = false
+                    score += impact.scoreDelta
+                    combatMessage = when {
+                        impact.baseHit -> "阵地基地遭到炮击"
+                        impact.destroyedTile -> "障碍物已摧毁"
+                        else -> "炮弹被装甲工事拦截"
+                    }
+                }
             }
 
             if (bullet.active && bullet.team != enemy.team && enemy.alive && intersects(bullet, enemy)) {
