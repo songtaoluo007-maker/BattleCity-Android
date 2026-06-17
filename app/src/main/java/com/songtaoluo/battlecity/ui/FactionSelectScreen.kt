@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.model.CampaignData
 import com.songtaoluo.battlecity.model.ScenarioData
@@ -44,13 +45,20 @@ internal fun FactionSelectScreen(
 @Composable
 private fun ScenarioCard(scenario: ScenarioData, onSelect: (ScenarioData) -> Unit) {
     Card(
-        modifier = Modifier.width(330.dp).height(230.dp),
+        modifier = Modifier.width(350.dp).height(300.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xEE1A1F1A)),
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            OriginalResourceImage(
+                stem = OriginalVisualAssetCatalog.factionFlagStem(scenario.faction),
+                contentDescription = scenario.faction.displayName,
+                modifier = Modifier.fillMaxWidth().height(82.dp),
+                contentScale = ContentScale.Fit,
+                fallbackColor = Color(0xFF292F29),
+            )
             Text(scenario.faction.displayName, color = Color.White, style = MaterialTheme.typography.titleLarge)
             Text(scenario.operation, color = Color(0xFFFFD54F))
             Text(scenario.historicalBackground, color = Color(0xFFD6D8D1), modifier = Modifier.weight(1f))
