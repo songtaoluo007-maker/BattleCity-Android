@@ -22,28 +22,31 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('app/src/main/java/com/songtaoluo/battlecity/game/GameEngine.kt')
           text = path.read_text(encoding='utf-8')
 
-          old_property = '''    var battleElapsedMs: Long = 0L
-              private set
-          '''
-          new_property = '''    private val battleClock = BattleClock()
+          property_pattern = re.compile(
+              r'    var battleElapsedMs: Long = 0L\n        private set'
+          )
+          property_replacement = (
+              '    private val battleClock = BattleClock()\n\n'
+              '    val battleElapsedMs: Long\n'
+              '        get() = battleClock.elapsedMs'
+          )
+          text, property_count = property_pattern.subn(property_replacement, text, count=1)
 
-              val battleElapsedMs: Long
-                  get() = battleClock.elapsedMs
-          '''
           old_advance = '        battleElapsedMs += (deltaSeconds.coerceAtLeast(0f) * 1000f).toLong()'
           new_advance = '        battleClock.advance(deltaSeconds)'
-
-          if old_property not in text:
-              raise SystemExit('battleElapsedMs property block not found')
-          if old_advance not in text:
-              raise SystemExit('battleElapsedMs advance line not found')
-
-          text = text.replace(old_property, new_property, 1)
+          advance_count = text.count(old_advance)
           text = text.replace(old_advance, new_advance, 1)
+
+          if property_count != 1:
+              raise SystemExit(f'battleElapsedMs property replacements: {property_count}')
+          if advance_count != 1:
+              raise SystemExit(f'battleElapsedMs advance matches: {advance_count}')
+
           path.write_text(text, encoding='utf-8')
           PY
 
