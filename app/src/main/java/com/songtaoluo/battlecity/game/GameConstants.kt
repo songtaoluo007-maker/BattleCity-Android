@@ -3,6 +3,7 @@ package com.songtaoluo.battlecity.game
 object GameConstants {
     const val BOARD_TILES = 17
     const val TILE_SIZE = 32f
+    const val BOARD_SIZE = BOARD_TILES * TILE_SIZE
     const val TANK_SIZE = 26f
     const val SCOUT_SIZE = 24f
     const val PLAYER_ID = 1
