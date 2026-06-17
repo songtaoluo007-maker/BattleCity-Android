@@ -10,13 +10,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -30,12 +30,14 @@ import com.songtaoluo.battlecity.model.Direction
 import kotlinx.coroutines.isActive
 
 @Composable
-internal fun BattleContent() {
-    val engine = remember { GameEngine() }
-    var direction by remember { mutableStateOf<Direction?>(null) }
-    var frame by remember { mutableIntStateOf(0) }
+internal fun BattleContent(
+    engine: GameEngine,
+    onExit: () -> Unit,
+) {
+    var direction by mutableStateOf<Direction?>(null)
+    var frame by mutableIntStateOf(0)
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(engine) {
         var previous = 0L
         while (isActive) {
             withFrameNanos { now ->
@@ -77,11 +79,15 @@ internal fun BattleContent() {
                 engine.targetingMode == TargetingMode.NONE,
             modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp).size(112.dp, 58.dp),
         ) { Text("FIRE") }
+        OutlinedButton(
+            onClick = onExit,
+            modifier = Modifier.align(Alignment.TopEnd).padding(14.dp),
+        ) { Text("退出战斗") }
         if (engine.targetingMode != TargetingMode.NONE) {
             TargetingPrompt(engine, Modifier.align(Alignment.TopStart).padding(16.dp))
         }
         if (engine.victory || engine.gameOver) {
-            ResultPanel(engine, Modifier.align(Alignment.Center))
+            ResultPanel(engine, onExit, Modifier.align(Alignment.Center))
         }
     }
 }
@@ -147,9 +153,10 @@ private fun DirectionPad(
 }
 
 @Composable
-private fun ResultPanel(engine: GameEngine, modifier: Modifier) {
+private fun ResultPanel(engine: GameEngine, onExit: () -> Unit, modifier: Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier.background(Color(0xDD111111)).padding(28.dp),
     ) {
         Text(
@@ -161,5 +168,6 @@ private fun ResultPanel(engine: GameEngine, modifier: Modifier) {
             "战果 ${engine.destroyedEnemies}  友军存活 ${engine.alliesAlive}  得分 ${engine.score}",
             color = Color.White,
         )
+        Button(onClick = onExit) { Text("返回作战简报") }
     }
 }
