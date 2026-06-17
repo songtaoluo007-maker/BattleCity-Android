@@ -12,7 +12,7 @@ import org.junit.Test
 
 class MovementSystemTest {
     @Test
-    fun solidTerrainBlocksMovement() {
+    fun solidTerrainStopsAtLastLegalPosition() {
         val solidTypes = listOf(
             TileType.BRICK,
             TileType.STEEL,
@@ -24,10 +24,27 @@ class MovementSystemTest {
             tiles[5][5] = tileType
             val tank = tankAt(5, 6)
             val originalY = tank.position.y
+
             val moved = MovementSystem.tryMove(tank, Direction.UP, 20f, tiles)
-            assertFalse(moved)
-            assertEquals(originalY, tank.position.y, 0.001f)
+
+            assertTrue(moved)
+            assertTrue(tank.position.y < originalY)
+            assertFalse(MovementSystem.collidesWithSolid(tank, tiles))
         }
+    }
+
+    @Test
+    fun largeMovementCannotTunnelThroughWall() {
+        val tiles = emptyBoard()
+        tiles[5][5] = TileType.STEEL
+        val tank = tankAt(5, 8)
+
+        MovementSystem.tryMove(tank, Direction.UP, 140f, tiles)
+
+        val wallBottom = 6 * GameConstants.TILE_SIZE
+        val tankTop = tank.position.y - GameConstants.TANK_SIZE / 2f - GameConstants.WALL_CLEARANCE
+        assertTrue(tankTop >= wallBottom - 0.001f)
+        assertFalse(MovementSystem.collidesWithSolid(tank, tiles))
     }
 
     @Test
@@ -48,12 +65,30 @@ class MovementSystemTest {
     }
 
     @Test
-    fun waterReducesTankSpeed() {
+    fun waterAndBrokenTracksStackTheirSpeedPenalties() {
         val tiles = emptyBoard()
         tiles[6][5] = TileType.WATER
-        val tank = tankAt(5, 6)
+        val tank = tankAt(5, 6).apply { trackBrokenMs = 1000f }
+
         val speed = MovementSystem.effectiveSpeed(tank, tiles)
-        assertEquals(tank.speed * 0.52f, speed, 0.001f)
+
+        assertEquals(
+            tank.speed * GameConstants.WATER_SPEED_MULTIPLIER * GameConstants.BROKEN_TRACK_SPEED_MULTIPLIER,
+            speed,
+            0.001f,
+        )
+    }
+
+    @Test
+    fun timedSpeedBoostAddsConfiguredBonus() {
+        val tiles = emptyBoard()
+        val tank = tankAt(5, 6).apply { speedBoostMs = 1000f }
+
+        assertEquals(
+            tank.speed + GameConstants.POWER_UP_SPEED_BONUS,
+            MovementSystem.effectiveSpeed(tank, tiles),
+            0.001f,
+        )
     }
 
     @Test
