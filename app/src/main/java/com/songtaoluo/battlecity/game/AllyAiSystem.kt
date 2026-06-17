@@ -33,18 +33,12 @@ object AllyAiSystem {
             }
         }
 
-        val destination = when (order) {
-            SquadOrder.HOLD -> null
-            SquadOrder.ASSAULT -> target?.position ?: objective
-            SquadOrder.FOCUS_FIRE -> target?.position ?: formationPoint(ally, player)
-            SquadOrder.FOLLOW -> formationPoint(ally, player)
-        } ?: return
-
-        if (distanceToPoint(ally, destination) < 28f) return
+        val destination = movementTarget(ally, player, target, order, objective) ?: return
+        val stoppingDistance = if (order == SquadOrder.ASSAULT) 82f else 28f
+        if (distanceToPoint(ally, destination) < stoppingDistance) return
 
         val distance = MovementSystem.effectiveSpeed(ally, tiles) * deltaSeconds
-        val directions = preferredDirections(ally, destination)
-        val moved = directions.any { direction ->
+        val moved = preferredDirections(ally, destination).any { direction ->
             if (ally.blockedMs > 0f && ally.blockedDirection == direction) {
                 false
             } else {
@@ -67,8 +61,8 @@ object AllyAiSystem {
 
     fun formationPoint(ally: Tank, player: Tank): Vec2 {
         val slot = if (ally.id % 2 == 0) -1f else 1f
-        val sideOffset = 58f * slot
-        val trail = 82f
+        val sideOffset = GameConstants.FORMATION_OFFSET * slot
+        val trail = GameConstants.FORMATION_TRAIL
         return when (player.direction) {
             Direction.UP -> Vec2(player.position.x + sideOffset, player.position.y + trail)
             Direction.DOWN -> Vec2(player.position.x + sideOffset, player.position.y - trail)
@@ -81,10 +75,37 @@ object AllyAiSystem {
         }
     }
 
+    fun isOnFormationSide(ally: Tank, player: Tank): Boolean {
+        val tolerance = GameConstants.TILE_SIZE
+        return when (player.direction) {
+            Direction.UP -> ally.position.y > player.position.y + tolerance
+            Direction.DOWN -> ally.position.y < player.position.y - tolerance
+            Direction.LEFT -> ally.position.x > player.position.x + tolerance
+            Direction.RIGHT -> ally.position.x < player.position.x - tolerance
+        }
+    }
+
     fun nearestEnemy(source: Tank, enemies: List<Tank>): Tank? =
         enemies.asSequence()
-            .filter { it.alive }
+            .filter { it.alive && it.isSpotted }
             .minByOrNull { EnemyAiSystem.distanceBetween(source, it) }
+
+    private fun movementTarget(
+        ally: Tank,
+        player: Tank,
+        target: Tank?,
+        order: SquadOrder,
+        objective: Vec2,
+    ): Vec2? = when (order) {
+        SquadOrder.HOLD -> null
+        SquadOrder.ASSAULT -> target?.position ?: objective
+        SquadOrder.FOCUS_FIRE -> when {
+            target != null && EnemyAiSystem.distanceBetween(ally, target) > 82f -> target.position
+            isOnFormationSide(ally, player) -> formationPoint(ally, player)
+            else -> null
+        }
+        SquadOrder.FOLLOW -> if (isOnFormationSide(ally, player)) formationPoint(ally, player) else null
+    }
 
     private fun preferredDirections(source: Tank, destination: Vec2): List<Direction> {
         val dx = destination.x - source.position.x
