@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.game.GameEngine
+import com.songtaoluo.battlecity.game.TargetingMode
 import com.songtaoluo.battlecity.game.VehicleCatalog
 import com.songtaoluo.battlecity.model.Direction
 import kotlinx.coroutines.isActive
@@ -48,10 +49,18 @@ internal fun BattleContent() {
         }
     }
 
+    LaunchedEffect(engine.targetingMode) {
+        if (engine.targetingMode != TargetingMode.NONE) direction = null
+    }
+
     Box(Modifier.fillMaxSize().background(Color(0xFF10150F))) {
         BattlefieldCanvas(engine, frame, Modifier.fillMaxSize())
         BattleHud(engine, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
-        DirectionPad({ direction = it }, Modifier.align(Alignment.BottomStart).padding(20.dp))
+        DirectionPad(
+            onDirection = { direction = it },
+            enabled = engine.targetingMode == TargetingMode.NONE,
+            modifier = Modifier.align(Alignment.BottomStart).padding(20.dp),
+        )
         SquadControls(
             current = engine.squadOrder,
             onChange = engine::setSquadOrder,
@@ -63,9 +72,14 @@ internal fun BattleContent() {
         )
         Button(
             onClick = engine::fire,
-            enabled = engine.player.alive && !engine.victory,
+            enabled = engine.player.alive &&
+                !engine.victory &&
+                engine.targetingMode == TargetingMode.NONE,
             modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp).size(112.dp, 58.dp),
         ) { Text("FIRE") }
+        if (engine.targetingMode != TargetingMode.NONE) {
+            TargetingPrompt(engine, Modifier.align(Alignment.TopStart).padding(16.dp))
+        }
         if (engine.victory || engine.gameOver) {
             ResultPanel(engine, Modifier.align(Alignment.Center))
         }
@@ -75,6 +89,7 @@ internal fun BattleContent() {
 @Composable
 private fun BattleHud(engine: GameEngine, modifier: Modifier) {
     val spec = VehicleCatalog.get(engine.player.vehicleId)
+    val focusName = engine.selectedFocusTarget?.let { VehicleCatalog.get(it.vehicleId).shortName } ?: "无"
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Text(engine.scenario.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
         Text(
@@ -85,7 +100,7 @@ private fun BattleHud(engine: GameEngine, modifier: Modifier) {
         Text(
             "${spec.shortName} HP ${engine.player.hp}/${engine.player.maxHp}  " +
                 "友军 ${engine.alliesAlive}  敌军在场 ${engine.enemies.size}  剩余 ${engine.enemiesLeft}  " +
-                "补给 ${engine.powerUps.size}",
+                "补给 ${engine.powerUps.size}  集火 $focusName",
             color = Color(0xFFD8D0A8),
         )
         Text(engine.combatMessage, color = Color(0xFFFFE082))
@@ -93,15 +108,41 @@ private fun BattleHud(engine: GameEngine, modifier: Modifier) {
 }
 
 @Composable
-private fun DirectionPad(onDirection: (Direction?) -> Unit, modifier: Modifier) {
+private fun TargetingPrompt(engine: GameEngine, modifier: Modifier) {
+    val title = when (engine.targetingMode) {
+        TargetingMode.ARTILLERY -> "炮击选点"
+        TargetingMode.FOCUS_FIRE -> "集火选敌"
+        TargetingMode.NONE -> return
+    }
+    val detail = when (engine.targetingMode) {
+        TargetingMode.ARTILLERY -> "点击战场确定炮火覆盖中心"
+        TargetingMode.FOCUS_FIRE -> "点击带红色识别环的可见敌车"
+        TargetingMode.NONE -> ""
+    }
+    Column(
+        modifier = modifier.background(Color(0xDD111111)).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(title, color = Color(0xFFFFD54F), style = MaterialTheme.typography.titleMedium)
+        Text(detail, color = Color.White, style = MaterialTheme.typography.bodySmall)
+        Button(onClick = engine::cancelTargeting) { Text("取消") }
+    }
+}
+
+@Composable
+private fun DirectionPad(
+    onDirection: (Direction?) -> Unit,
+    enabled: Boolean,
+    modifier: Modifier,
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
-        Button(onClick = { onDirection(Direction.UP) }) { Text("↑") }
+        Button(onClick = { onDirection(Direction.UP) }, enabled = enabled) { Text("↑") }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { onDirection(Direction.LEFT) }) { Text("←") }
-            Button(onClick = { onDirection(null) }) { Text("■") }
-            Button(onClick = { onDirection(Direction.RIGHT) }) { Text("→") }
+            Button(onClick = { onDirection(Direction.LEFT) }, enabled = enabled) { Text("←") }
+            Button(onClick = { onDirection(null) }, enabled = enabled) { Text("■") }
+            Button(onClick = { onDirection(Direction.RIGHT) }, enabled = enabled) { Text("→") }
         }
-        Button(onClick = { onDirection(Direction.DOWN) }) { Text("↓") }
+        Button(onClick = { onDirection(Direction.DOWN) }, enabled = enabled) { Text("↓") }
     }
 }
 
