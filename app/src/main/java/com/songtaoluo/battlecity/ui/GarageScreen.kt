@@ -1,5 +1,6 @@
 package com.songtaoluo.battlecity.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,8 @@ import com.songtaoluo.battlecity.game.VehicleCatalog
 import com.songtaoluo.battlecity.model.ScenarioData
 import com.songtaoluo.battlecity.model.VehicleId
 import com.songtaoluo.battlecity.model.VehicleSpec
+import com.songtaoluo.battlecity.ui.art.OriginalArtCatalog
+import com.songtaoluo.battlecity.ui.art.OriginalArtImage
 
 @Composable
 internal fun GarageScreen(
@@ -75,7 +78,7 @@ private fun VehicleCard(
     onPurchase: (VehicleId) -> Unit,
 ) {
     Card(
-        modifier = Modifier.width(290.dp).height(290.dp),
+        modifier = Modifier.width(290.dp).height(360.dp),
         colors = CardDefaults.cardColors(
             containerColor = when {
                 selected && owned -> Color(0xFF344233)
@@ -90,6 +93,12 @@ private fun VehicleCard(
         ) {
             Text(vehicle.displayName, color = if (owned) Color.White else Color(0xFF9A9C96), style = MaterialTheme.typography.titleMedium)
             Text(vehicle.role.wireValue, color = Color(0xFFFFD54F))
+            OriginalArtImage(
+                region = OriginalArtCatalog.vehicle(vehicle.id),
+                contentDescription = vehicle.displayName,
+                modifier = Modifier.fillMaxWidth().height(92.dp).background(Color(0xFF111411)),
+                alpha = if (owned) 1f else 0.45f,
+            )
             Text(vehicle.history, color = Color(0xFFD6D8D1), modifier = Modifier.weight(1f))
             Text("HP ${vehicle.hp}  速度 ${vehicle.speed.toInt()}  穿深 ${vehicle.penetration}", color = Color(0xFFB8BCAE))
             Text("装甲 ${vehicle.armorFront}/${vehicle.armorSide}/${vehicle.armorRear}", color = Color(0xFFB8BCAE))
