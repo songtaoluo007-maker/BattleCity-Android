@@ -13,13 +13,14 @@ import com.songtaoluo.battlecity.model.SquadOrder
 internal fun SquadControls(
     current: SquadOrder,
     onChange: (SquadOrder) -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = modifier) {
-        SquadButton("跟随", SquadOrder.FOLLOW, current, onChange)
-        SquadButton("坚守", SquadOrder.HOLD, current, onChange)
-        SquadButton("突击", SquadOrder.ASSAULT, current, onChange)
-        SquadButton("集火", SquadOrder.FOCUS_FIRE, current, onChange)
+        SquadButton("跟随", SquadOrder.FOLLOW, current, enabled, onChange)
+        SquadButton("坚守", SquadOrder.HOLD, current, enabled, onChange)
+        SquadButton("突击", SquadOrder.ASSAULT, current, enabled, onChange)
+        SquadButton("集火", SquadOrder.FOCUS_FIRE, current, enabled, onChange)
     }
 }
 
@@ -28,11 +29,12 @@ private fun SquadButton(
     label: String,
     value: SquadOrder,
     current: SquadOrder,
+    controlsEnabled: Boolean,
     onChange: (SquadOrder) -> Unit,
 ) {
     Button(
         onClick = { onChange(value) },
-        enabled = current != value || value == SquadOrder.FOCUS_FIRE,
+        enabled = controlsEnabled && (current != value || value == SquadOrder.FOCUS_FIRE),
     ) {
         Text(label)
     }
