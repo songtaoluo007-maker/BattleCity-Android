@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.game.VehicleCatalog
 import com.songtaoluo.battlecity.model.ScenarioData
@@ -75,7 +76,7 @@ private fun VehicleCard(
     onPurchase: (VehicleId) -> Unit,
 ) {
     Card(
-        modifier = Modifier.width(290.dp).height(290.dp),
+        modifier = Modifier.width(310.dp).height(360.dp),
         colors = CardDefaults.cardColors(
             containerColor = when {
                 selected && owned -> Color(0xFF344233)
@@ -88,6 +89,13 @@ private fun VehicleCard(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            OriginalResourceImage(
+                stem = OriginalVisualAssetCatalog.tankStem(vehicle.id),
+                contentDescription = vehicle.displayName,
+                modifier = Modifier.fillMaxWidth().height(112.dp),
+                contentScale = ContentScale.Fit,
+                fallbackColor = Color(0xFF2B332B),
+            )
             Text(vehicle.displayName, color = if (owned) Color.White else Color(0xFF9A9C96), style = MaterialTheme.typography.titleMedium)
             Text(vehicle.role.wireValue, color = Color(0xFFFFD54F))
             Text(vehicle.history, color = Color(0xFFD6D8D1), modifier = Modifier.weight(1f))
