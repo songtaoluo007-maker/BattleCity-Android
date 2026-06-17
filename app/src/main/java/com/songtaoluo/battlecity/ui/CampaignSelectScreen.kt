@@ -4,6 +4,7 @@ import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -24,17 +26,30 @@ import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.game.CampaignCatalog
 import com.songtaoluo.battlecity.game.MigratedContentCatalog
 import com.songtaoluo.battlecity.model.CampaignData
+import com.songtaoluo.battlecity.progression.PlayerProgress
 
 @Composable
-internal fun CampaignSelectScreen(onSelect: (CampaignData) -> Unit) {
+internal fun CampaignSelectScreen(
+    progress: PlayerProgress,
+    onSettings: () -> Unit,
+    onSelect: (CampaignData) -> Unit,
+) {
     FrontEndLayout {
         Text("欧洲装甲战争档案", color = Color.White, style = MaterialTheme.typography.headlineMedium)
         Text("选择战役。未迁移内容保留为档案，不加载占位关卡。", color = Color(0xFFD8D0A8))
+        Text(
+            "战斗 ${progress.totalBattles}  胜利 ${progress.totalVictories}  累计军费 ${progress.totalCredits}",
+            color = Color(0xFFFFE082),
+        )
         Spacer(Modifier.height(18.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             items(CampaignCatalog.all, key = { it.id }) { campaign ->
                 CampaignCard(campaign, onSelect)
             }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(onClick = onSettings) { Text("设置与战绩") }
         }
     }
 }
