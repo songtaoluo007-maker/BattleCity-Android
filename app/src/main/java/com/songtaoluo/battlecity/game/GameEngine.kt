@@ -4,11 +4,13 @@ import com.songtaoluo.battlecity.model.Direction
 import com.songtaoluo.battlecity.model.GridPoint
 import com.songtaoluo.battlecity.model.HitResult
 import com.songtaoluo.battlecity.model.PowerUpType
+import com.songtaoluo.battlecity.model.ScenarioData
 import com.songtaoluo.battlecity.model.SquadOrder
 import com.songtaoluo.battlecity.model.SupportSkillType
 import com.songtaoluo.battlecity.model.TankKind
 import com.songtaoluo.battlecity.model.TeamSide
 import com.songtaoluo.battlecity.model.TileType
+import com.songtaoluo.battlecity.model.VehicleId
 import com.songtaoluo.battlecity.model.VehicleRole
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -16,13 +18,17 @@ import kotlin.random.Random
 
 class GameEngine(
     private val random: Random = Random.Default,
+    val scenario: ScenarioData = ScenarioCatalog.kurskGermanBreakthrough,
+    selectedVehicleId: VehicleId? = null,
 ) {
-    val scenario = ScenarioCatalog.kurskGermanBreakthrough
     val tiles: MutableList<MutableList<TileType>> = TileMapParser.parse(scenario.map)
         .map { it.toMutableList() }
         .toMutableList()
 
-    private val playerVehicle = VehicleCatalog.get(scenario.allyVehicles.first())
+    private val playerVehicle = VehicleCatalog.get(
+        selectedVehicleId?.takeIf { it in scenario.allyVehicles }
+            ?: scenario.allyVehicles.first(),
+    )
 
     val player: Tank = playerVehicle.createTank(
         id = GameConstants.PLAYER_ID,
