@@ -13,15 +13,15 @@ class EngineTargetingFlowTest {
     @Test
     fun artilleryDoesNotSpendPointsUntilBoardTap() {
         val engine = GameEngine(Random(10))
-        val target = engine.enemies.first()
-        target.isSpotted = true
 
         assertTrue(engine.useSupportSkill(SupportSkillType.ARTILLERY_BARRAGE))
         assertEquals(TargetingMode.ARTILLERY, engine.targetingMode)
         assertEquals(3, engine.commandPoints)
         assertEquals(0f, engine.supportCooldownMs(SupportSkillType.ARTILLERY_BARRAGE), 0.001f)
 
-        assertTrue(engine.handleBoardTap(target.position.x, target.position.y))
+        val emptyX = GameConstants.BOARD_SIZE - GameConstants.TILE_SIZE
+        val emptyY = GameConstants.BOARD_SIZE - GameConstants.TILE_SIZE
+        assertTrue(engine.handleBoardTap(emptyX, emptyY))
         assertEquals(TargetingMode.NONE, engine.targetingMode)
         assertEquals(0, engine.commandPoints)
         assertTrue(engine.supportCooldownMs(SupportSkillType.ARTILLERY_BARRAGE) > 0f)
