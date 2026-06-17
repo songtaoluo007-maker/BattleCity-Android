@@ -21,17 +21,25 @@ Implemented:
 - Validated 17 x 17 HarmonyOS tile-map parser
 - Scaled Compose Canvas rendering for the Kursk battlefield
 - Tank collision against brick, steel, base, and village tiles
+- Tank-to-tank collision and movement blocking
 - Water terrain slowdown using the original 0.52 multiplier
 - Destructible brick and village terrain
 - Steel destruction for shells with at least 130 penetration
 - Projectile blocking, base impact reporting, and terrain score rewards
-- Unit tests for vehicles, campaigns, maps, movement, terrain, armour, penetration, and rewards
+- Deterministic enemy pursuit with obstacle detours
+- Enemy line-of-fire checks and autonomous fire
+- Trapped enemy wall escape through destructible terrain
+- Scenario enemy budget, reinforcement timing, and five-unit active cap
+- Enemy damage against the player and mission failure state
+- Kursk breakthrough objective: required kills plus target-zone entry
+- Multi-unit rendering, hostile projectile colour, battle HUD, victory and defeat panels
+- Unit tests for vehicles, campaigns, maps, movement, terrain, AI, waves, armour, penetration, and rewards
 - GitHub Actions test and debug APK build pipeline
 
 Next migration stages:
 
-1. Enemy AI, enemy fire, and multiple active enemies
-2. Tank-to-tank collision and crowd avoidance
+1. Projectile-to-projectile collision and visual hit effects
+2. Ally tanks, squad orders, and formation movement
 3. Campaign, faction, garage, and briefing screens
 4. Original tank image assets and visual effects
 5. Audio system, save data, achievements, and progression
@@ -62,6 +70,8 @@ app/src/main/java/com/songtaoluo/battlecity/
 ├── game/
 │   ├── CampaignCatalog.kt
 │   ├── CombatResolver.kt
+│   ├── EnemyAiController.kt
+│   ├── EnemyAiSystem.kt
 │   ├── GameConstants.kt
 │   ├── GameEngine.kt
 │   ├── GameModels.kt
@@ -75,5 +85,7 @@ app/src/main/java/com/songtaoluo/battlecity/
 │   ├── GameTypes.kt
 │   └── ScenarioModels.kt
 └── ui/
+    ├── BattleContent.kt
+    ├── BattlefieldCanvas.kt
     └── BattleScreen.kt
 ```
