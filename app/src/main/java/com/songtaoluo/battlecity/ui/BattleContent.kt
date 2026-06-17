@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -34,8 +35,8 @@ internal fun BattleContent(
     engine: GameEngine,
     onExit: () -> Unit,
 ) {
-    var direction by mutableStateOf<Direction?>(null)
-    var frame by mutableIntStateOf(0)
+    var direction by remember(engine) { mutableStateOf<Direction?>(null) }
+    var frame by remember(engine) { mutableIntStateOf(0) }
 
     LaunchedEffect(engine) {
         var previous = 0L
