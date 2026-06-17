@@ -6,6 +6,7 @@ enum class AppStage {
     GARAGE,
     BRIEFING,
     BATTLE,
+    SETTINGS,
 }
 
 data class AppFlowState(
@@ -33,6 +34,8 @@ data class AppFlowState(
 
     fun startBattle(): AppFlowState = copy(stage = AppStage.BATTLE)
 
+    fun showSettings(): AppFlowState = copy(stage = AppStage.SETTINGS)
+
     fun back(): AppFlowState = when (stage) {
         AppStage.CAMPAIGN -> this
         AppStage.FACTION -> copy(
@@ -48,5 +51,6 @@ data class AppFlowState(
         )
         AppStage.BRIEFING -> copy(stage = AppStage.GARAGE)
         AppStage.BATTLE -> copy(stage = AppStage.BRIEFING)
+        AppStage.SETTINGS -> copy(stage = AppStage.CAMPAIGN)
     }
 }
