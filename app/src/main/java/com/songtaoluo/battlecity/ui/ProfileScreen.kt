@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,15 +24,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.game.AchievementCatalog
 import com.songtaoluo.battlecity.model.AchievementDefinition
 import com.songtaoluo.battlecity.model.Faction
 import com.songtaoluo.battlecity.model.SaveData
 import com.songtaoluo.battlecity.ui.art.OriginalArtCatalog
-import com.songtaoluo.battlecity.ui.art.OriginalArtImage
+import com.songtaoluo.battlecity.ui.art.OriginalArtNames
+import com.songtaoluo.battlecity.ui.art.PreferredOriginalArtImage
 
 @Composable
 internal fun ProfileScreen(
@@ -51,10 +55,17 @@ internal fun ProfileScreen(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Column(
-                modifier = Modifier.width(280.dp).fillMaxHeight()
+                modifier = Modifier.width(290.dp).fillMaxHeight()
                     .background(Color(0xDD1A1F1A)).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                PreferredOriginalArtImage(
+                    resourceStem = "command_hq_bg_portrait",
+                    region = null,
+                    contentDescription = "指挥部档案背景",
+                    modifier = Modifier.fillMaxWidth().height(130.dp),
+                    contentScale = ContentScale.Crop,
+                )
                 Text(saveData.playerProfile.title, color = Color(0xFFFFD54F), style = MaterialTheme.typography.titleLarge)
                 OutlinedTextField(
                     value = callsign,
@@ -116,8 +127,10 @@ private fun AchievementCard(definition: AchievementDefinition, unlocked: Boolean
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            OriginalArtImage(
+            PreferredOriginalArtImage(
+                resourceStem = OriginalArtNames.medal(definition.id, unlocked),
                 region = OriginalArtCatalog.medal(definition.id, unlocked),
                 contentDescription = definition.name,
                 modifier = Modifier.size(54.dp),
