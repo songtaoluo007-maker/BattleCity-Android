@@ -9,84 +9,72 @@ import com.songtaoluo.battlecity.game.CampaignCatalog
 import com.songtaoluo.battlecity.game.GameEngine
 import com.songtaoluo.battlecity.game.MigratedContentCatalog
 import com.songtaoluo.battlecity.game.VehicleCatalog
-import com.songtaoluo.battlecity.model.VehicleId
-
-enum class AppStage {
-    CAMPAIGN,
-    FACTION,
-    GARAGE,
-    BRIEFING,
-    BATTLE,
-}
+import com.songtaoluo.battlecity.model.AppFlowState
+import com.songtaoluo.battlecity.model.AppStage
 
 @Composable
 fun BattleCityApp() {
-    var stage by remember { mutableStateOf(AppStage.CAMPAIGN) }
-    var campaignId by remember { mutableStateOf<String?>(null) }
-    var scenarioId by remember { mutableStateOf<String?>(null) }
-    var vehicleId by remember { mutableStateOf<VehicleId?>(null) }
+    var flow by remember { mutableStateOf(AppFlowState()) }
 
-    val campaign = campaignId?.let(CampaignCatalog::get)
-    val scenarios = campaignId?.let(MigratedContentCatalog::scenariosForCampaign).orEmpty()
-    val scenario = scenarioId?.let { id -> scenarios.firstOrNull { it.id == id } }
-    val vehicle = vehicleId?.let(VehicleCatalog::get)
+    val campaign = flow.campaignId?.let(CampaignCatalog::get)
+    val scenarios = flow.campaignId
+        ?.let(MigratedContentCatalog::scenariosForCampaign)
+        .orEmpty()
+    val scenario = flow.scenarioId?.let { id -> scenarios.firstOrNull { it.id == id } }
+    val vehicle = flow.vehicleId?.let(VehicleCatalog::get)
 
-    when (stage) {
+    when (flow.stage) {
         AppStage.CAMPAIGN -> CampaignSelectScreen { selected ->
-            campaignId = selected.id
-            scenarioId = null
-            vehicleId = null
-            stage = AppStage.FACTION
+            flow = flow.selectCampaign(selected.id)
         }
 
         AppStage.FACTION -> {
-            if (campaign == null || scenarios.isEmpty()) {
-                stage = AppStage.CAMPAIGN
-            } else {
+            if (campaign != null && scenarios.isNotEmpty()) {
                 FactionSelectScreen(
                     campaign = campaign,
                     scenarios = scenarios,
-                    onBack = { stage = AppStage.CAMPAIGN },
+                    onBack = { flow = flow.back() },
                     onSelect = { selected ->
-                        scenarioId = selected.id
-                        vehicleId = selected.allyVehicles.firstOrNull()
-                        stage = AppStage.GARAGE
+                        flow = flow.selectScenario(
+                            id = selected.id,
+                            defaultVehicleId = selected.allyVehicles.firstOrNull(),
+                        )
                     },
                 )
+            } else {
+                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
             }
         }
 
         AppStage.GARAGE -> {
-            if (scenario == null) {
-                stage = AppStage.FACTION
-            } else {
+            if (scenario != null) {
                 GarageScreen(
                     scenario = scenario,
-                    selectedVehicleId = vehicleId,
-                    onBack = { stage = AppStage.FACTION },
-                    onSelect = { vehicleId = it },
-                    onContinue = { stage = AppStage.BRIEFING },
+                    selectedVehicleId = flow.vehicleId,
+                    onBack = { flow = flow.back() },
+                    onSelect = { flow = flow.selectVehicle(it) },
+                    onContinue = { flow = flow.showBriefing() },
                 )
+            } else {
+                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
             }
         }
 
         AppStage.BRIEFING -> {
-            if (scenario == null || vehicle == null) {
-                stage = AppStage.GARAGE
-            } else {
+            if (scenario != null && vehicle != null) {
                 BriefingScreen(
                     scenario = scenario,
                     vehicle = vehicle,
-                    onBack = { stage = AppStage.GARAGE },
-                    onStart = { stage = AppStage.BATTLE },
+                    onBack = { flow = flow.back() },
+                    onStart = { flow = flow.startBattle() },
                 )
+            } else {
+                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
             }
         }
 
         AppStage.BATTLE -> {
-            if (scenario == null || vehicle == null) {
-                stage = AppStage.BRIEFING
-            } else {
+            if (scenario != null && vehicle != null) {
                 val engine = remember(scenario.id, vehicle.id) {
                     GameEngine(
                         scenario = scenario,
@@ -95,8 +83,10 @@ fun BattleCityApp() {
                 }
                 BattleScreen(
                     engine = engine,
-                    onExit = { stage = AppStage.BRIEFING },
+                    onExit = { flow = flow.back() },
                 )
+            } else {
+                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
             }
         }
     }
