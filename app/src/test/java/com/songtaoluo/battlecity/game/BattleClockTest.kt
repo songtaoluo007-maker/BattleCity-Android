@@ -16,6 +16,18 @@ class BattleClockTest {
     }
 
     @Test
+    fun fractionalRemainderCarriesAcrossUnevenFrames() {
+        val clock = BattleClock()
+
+        clock.advance(0.0004f)
+        clock.advance(0.0004f)
+        assertEquals(0L, clock.elapsedMs)
+
+        clock.advance(0.0004f)
+        assertEquals(1L, clock.elapsedMs)
+    }
+
+    @Test
     fun invalidAndNegativeDeltasAreIgnored() {
         val clock = BattleClock()
 
