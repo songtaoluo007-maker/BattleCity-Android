@@ -14,9 +14,12 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import com.songtaoluo.battlecity.game.GameConstants
 import com.songtaoluo.battlecity.game.GameEngine
+import com.songtaoluo.battlecity.game.PowerUp
+import com.songtaoluo.battlecity.game.TacticalArea
 import com.songtaoluo.battlecity.game.Tank
 import com.songtaoluo.battlecity.game.VehicleCatalog
 import com.songtaoluo.battlecity.model.Direction
+import com.songtaoluo.battlecity.model.PowerUpType
 import com.songtaoluo.battlecity.model.TeamSide
 import com.songtaoluo.battlecity.model.TileType
 import kotlin.math.min
@@ -41,9 +44,12 @@ internal fun BattlefieldCanvas(engine: GameEngine, frame: Int, modifier: Modifie
                 engine.tiles.forEachIndexed { row, values ->
                     values.forEachIndexed { column, tile -> drawBattleTile(tile, column, row) }
                 }
+                engine.reconArea?.let { drawTacticalArea(it, Color(0xFF64B5F6), 0.12f) }
+                engine.smokeArea?.let { drawTacticalArea(it, Color.White, 0.2f) }
+                engine.powerUps.forEach { drawPowerUp(it) }
                 if (engine.player.alive) drawTank(engine.player)
                 engine.allies.filter { it.alive }.forEach { drawTank(it) }
-                engine.enemies.filter { it.alive }.forEach { drawTank(it) }
+                engine.enemies.filter { it.alive && it.isSpotted }.forEach { drawTank(it) }
                 engine.bullets.forEach { bullet ->
                     drawCircle(
                         color = if (bullet.team == TeamSide.ENEMY) Color(0xFFFF7043) else Color(0xFFFFD54F),
@@ -55,6 +61,39 @@ internal fun BattlefieldCanvas(engine: GameEngine, frame: Int, modifier: Modifie
             }
         }
     }
+}
+
+private fun DrawScope.drawTacticalArea(area: TacticalArea, color: Color, alpha: Float) {
+    drawCircle(
+        color = color.copy(alpha = alpha),
+        radius = area.radius,
+        center = Offset(area.center.x, area.center.y),
+    )
+    drawCircle(
+        color = color.copy(alpha = 0.55f),
+        radius = area.radius,
+        center = Offset(area.center.x, area.center.y),
+        style = Stroke(width = 2f),
+    )
+}
+
+private fun DrawScope.drawPowerUp(powerUp: PowerUp) {
+    val center = Offset(powerUp.position.x, powerUp.position.y)
+    val color = when (powerUp.type) {
+        PowerUpType.SHIELD -> Color(0xFF42A5F5)
+        PowerUpType.SPEED -> Color(0xFF66BB6A)
+        PowerUpType.FIRE -> Color(0xFFFF7043)
+        PowerUpType.LIFE -> Color(0xFFEC407A)
+        PowerUpType.FREEZE -> Color(0xFF80DEEA)
+    }
+    val half = powerUp.size / 2f
+    drawRect(
+        color = Color(0xCC101010),
+        topLeft = Offset(center.x - half, center.y - half),
+        size = Size(powerUp.size, powerUp.size),
+    )
+    drawCircle(color, radius = half - 3f, center = center)
+    drawCircle(Color.White.copy(alpha = 0.8f), radius = 3f, center = center)
 }
 
 private fun DrawScope.drawBattleTile(tile: TileType, column: Int, row: Int) {
@@ -85,6 +124,10 @@ private fun DrawScope.drawBattleTile(tile: TileType, column: Int, row: Int) {
         }
         TileType.OBJECTIVE -> drawCircle(Color(0xFFFFD54F), 8f, topLeft + Offset(16f, 16f))
         TileType.BASE -> drawCircle(Color(0xFF493D1B), 8f, topLeft + Offset(16f, 16f))
+        TileType.MINE -> {
+            drawCircle(Color(0xFF17130F), 7f, topLeft + Offset(16f, 16f))
+            drawLine(Color(0xFF9E8B74), topLeft + Offset(11f, 16f), topLeft + Offset(21f, 16f), 2f)
+        }
         else -> Unit
     }
 }
@@ -102,12 +145,10 @@ private fun DrawScope.drawTank(tank: Tank) {
         TeamSide.ENEMY -> Color(0xFFEF5350)
     }
 
-    drawCircle(
-        color = teamColor,
-        radius = half + 4f,
-        center = center,
-        style = Stroke(width = 2f),
-    )
+    drawCircle(teamColor, half + 4f, center, style = Stroke(width = 2f))
+    if (tank.shieldMs > 0f) {
+        drawCircle(Color(0xFF90CAF9).copy(alpha = 0.75f), half + 8f, center, style = Stroke(width = 3f))
+    }
     drawRect(
         dark,
         Offset(center.x - half - 3f, center.y - half),
@@ -126,6 +167,13 @@ private fun DrawScope.drawTank(tank: Tank) {
     }
     drawLine(dark, center, barrel, strokeWidth = 6f, cap = StrokeCap.Round)
     drawCircle(trim, 6f, center)
+
+    if (tank.trackBrokenMs > 0f) {
+        drawLine(Color(0xFFFFC107), center + Offset(-8f, 8f), center + Offset(8f, -8f), 3f)
+    }
+    if (tank.apcrShots > 0) {
+        drawCircle(Color(0xFFFFEB3B), 3f, center + Offset(half - 2f, -half + 2f))
+    }
 
     val hpRatio = tank.hp.toFloat() / tank.maxHp.coerceAtLeast(1)
     drawRect(Color(0xAA111111), Offset(center.x - half, center.y - half - 8f), Size(GameConstants.TANK_SIZE, 4f))
