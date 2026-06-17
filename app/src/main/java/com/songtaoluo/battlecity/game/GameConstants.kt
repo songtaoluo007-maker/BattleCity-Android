@@ -7,6 +7,8 @@ object GameConstants {
     const val TANK_SIZE = 26f
     const val SCOUT_SIZE = 24f
     const val PLAYER_ID = 1
+    const val WALL_CLEARANCE = 2f
+    const val WATER_SPEED_MULTIPLIER = 0.52f
 
     const val PEN_RICOCHET_THRESHOLD = 0.5f
     const val PEN_ANGLE_BLEND = 0.4f
