@@ -7,6 +7,7 @@ import com.songtaoluo.battlecity.model.TeamSide
 import com.songtaoluo.battlecity.model.TileType
 import com.songtaoluo.battlecity.model.VehicleId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,6 +26,17 @@ class SquadFormationTest {
         assertTrue(secondPoint.x > player.position.x)
         assertTrue(firstPoint.y > player.position.y)
         assertEquals(firstPoint.y, secondPoint.y, 0.001f)
+    }
+
+    @Test
+    fun followerMustAlreadyBeBehindPlayerBeforeReforming() {
+        val player = unit(1, VehicleId.PZ_IV_H, 200f, 200f, TeamSide.PLAYER)
+        player.direction = Direction.UP
+        val behind = unit(100, VehicleId.PZ_IV_H, 160f, 250f, TeamSide.ALLY)
+        val ahead = unit(101, VehicleId.TIGER_I, 240f, 150f, TeamSide.ALLY)
+
+        assertTrue(AllyAiSystem.isOnFormationSide(behind, player))
+        assertFalse(AllyAiSystem.isOnFormationSide(ahead, player))
     }
 
     @Test
