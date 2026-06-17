@@ -53,11 +53,6 @@ object ProgressionSystem {
         } else {
             before.completedScenarios
         }
-        val completedCampaigns = if (summary.victory && summary.campaignId.isNotBlank()) {
-            before.completedCampaigns + summary.campaignId
-        } else {
-            before.completedCampaigns
-        }
         val profile = PlayerProfile(
             callsign = before.playerProfile.callsign,
             avatarId = before.playerProfile.avatarId,
@@ -70,12 +65,17 @@ object ProgressionSystem {
             bestScore = bestScore,
             credits = before.credits + summary.earnedCredits.coerceAtLeast(0),
             completedScenarios = completedScenarios,
-            completedCampaigns = completedCampaigns,
             totalKills = totalKills,
             totalPlayTimeSec = before.totalPlayTimeSec + summary.elapsedSeconds.coerceAtLeast(0L),
             achievements = achievements,
             playerProfile = profile,
         )
+    }
+
+    fun markCampaignCompleted(current: SaveData, campaignId: String): SaveData {
+        if (campaignId.isBlank()) return normalize(current)
+        val save = normalize(current)
+        return save.copy(completedCampaigns = save.completedCampaigns + campaignId)
     }
 
     fun updateProfile(
