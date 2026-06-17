@@ -32,7 +32,7 @@ private fun SquadButton(
 ) {
     Button(
         onClick = { onChange(value) },
-        enabled = current != value,
+        enabled = current != value || value == SquadOrder.FOCUS_FIRE,
     ) {
         Text(label)
     }
