@@ -27,7 +27,12 @@ data class Tank(
     val armorFront: Int,
     val armorSide: Int,
     val armorRear: Int,
+    val visionRange: Float,
+    val scoutReveal: Boolean,
     var cooldownMs: Float = 0f,
+    var aiTimerMs: Float = 0f,
+    var blockedMs: Float = 0f,
+    var blockedDirection: Direction? = null,
     var alive: Boolean = true,
 )
 
@@ -67,4 +72,6 @@ fun VehicleSpec.createTank(
     armorFront = armorFront,
     armorSide = armorSide,
     armorRear = armorRear,
+    visionRange = visionRange,
+    scoutReveal = scoutReveal,
 )
