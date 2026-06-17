@@ -10,16 +10,16 @@ object EnemyAiSystem {
         deltaSeconds: Float,
         tiles: List<List<TileType>>,
         blockers: List<Tank>,
-        fire: (Tank) -> Unit,
         canSeeTarget: Boolean = true,
+        fire: (Tank) -> Unit,
     ) = EnemyAiController.update(
         enemy,
         target,
         deltaSeconds,
         tiles,
         blockers,
-        fire,
         canSeeTarget,
+        fire,
     )
 
     fun firingDirection(source: Tank, target: Tank): Direction? =
