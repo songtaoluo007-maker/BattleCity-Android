@@ -62,7 +62,11 @@ def resolve_raw_directory(source: Path) -> Path:
     )
 
 
-def import_audio(source: Path, destination: Path) -> dict[str, object]:
+def import_audio(
+    source: Path,
+    destination: Path,
+    report_path: Path,
+) -> dict[str, object]:
     raw_directory = resolve_raw_directory(source)
     destination.mkdir(parents=True, exist_ok=True)
 
@@ -95,7 +99,8 @@ def import_audio(source: Path, destination: Path) -> dict[str, object]:
         "imported": imported,
         "missing": missing,
     }
-    (destination / "import-report.json").write_text(
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -111,10 +116,16 @@ def main() -> int:
         default=Path("app/src/main/res/raw"),
         help="Android raw resource directory",
     )
+    parser.add_argument(
+        "--report",
+        type=Path,
+        default=Path("build/reports/audio-import.json"),
+        help="Import report path outside Android resources",
+    )
     args = parser.parse_args()
 
     try:
-        report = import_audio(args.source, args.destination)
+        report = import_audio(args.source, args.destination, args.report)
     except (FileNotFoundError, OSError) as error:
         parser.error(str(error))
 
