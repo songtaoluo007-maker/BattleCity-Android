@@ -26,6 +26,8 @@ Implemented:
 - Destructible brick and village terrain
 - Steel destruction for shells with at least 130 penetration
 - Projectile blocking, base impact reporting, and terrain score rewards
+- Opposing projectile-to-projectile collision
+- Short-lived spark, hit-flash, and destruction visual feedback
 - Deterministic enemy pursuit with obstacle detours
 - Enemy line-of-fire checks and autonomous fire
 - Trapped enemy wall escape through destructible terrain
@@ -33,15 +35,15 @@ Implemented:
 - Enemy damage against the player and mission failure state
 - Kursk breakthrough objective: required kills plus target-zone entry
 - Multi-unit rendering, hostile projectile colour, battle HUD, victory and defeat panels
-- Unit tests for vehicles, campaigns, maps, movement, terrain, AI, waves, armour, penetration, and rewards
+- Unit tests for vehicles, campaigns, maps, movement, terrain, AI, waves, projectile collisions, visual feedback, armour, penetration, and rewards
 - GitHub Actions test and debug APK build pipeline
 
 Next migration stages:
 
-1. Projectile-to-projectile collision and visual hit effects
-2. Ally tanks, squad orders, and formation movement
+1. Ally tanks, squad orders, and formation movement
+2. Power-ups and battlefield support skills
 3. Campaign, faction, garage, and briefing screens
-4. Original tank image assets and visual effects
+4. Original tank image assets and richer visual effects
 5. Audio system, save data, achievements, and progression
 6. Remaining historical scenarios
 
@@ -68,6 +70,7 @@ Every push to `main` is configured to run the unit tests, build a debug APK, and
 app/src/main/java/com/songtaoluo/battlecity/
 ├── MainActivity.kt
 ├── game/
+│   ├── BulletCollisionSystem.kt
 │   ├── CampaignCatalog.kt
 │   ├── CombatResolver.kt
 │   ├── EnemyAiController.kt
@@ -75,6 +78,7 @@ app/src/main/java/com/songtaoluo/battlecity/
 │   ├── GameConstants.kt
 │   ├── GameEngine.kt
 │   ├── GameModels.kt
+│   ├── ImpactEffects.kt
 │   ├── MovementSystem.kt
 │   ├── ProjectileSystem.kt
 │   ├── ScenarioCatalog.kt
@@ -87,5 +91,6 @@ app/src/main/java/com/songtaoluo/battlecity/
 └── ui/
     ├── BattleContent.kt
     ├── BattlefieldCanvas.kt
-    └── BattleScreen.kt
+    ├── BattleScreen.kt
+    └── ImpactEffectRenderer.kt
 ```
