@@ -29,7 +29,8 @@ import com.songtaoluo.battlecity.game.MigratedContentCatalog
 import com.songtaoluo.battlecity.model.CampaignData
 import com.songtaoluo.battlecity.model.SaveData
 import com.songtaoluo.battlecity.ui.art.OriginalArtCatalog
-import com.songtaoluo.battlecity.ui.art.OriginalArtImage
+import com.songtaoluo.battlecity.ui.art.OriginalArtNames
+import com.songtaoluo.battlecity.ui.art.PreferredOriginalArtImage
 
 @Composable
 internal fun CampaignSelectScreen(
@@ -94,7 +95,8 @@ private fun CampaignCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Spacer(Modifier.fillMaxWidth().height(6.dp).background(accent))
-            OriginalArtImage(
+            PreferredOriginalArtImage(
+                resourceStem = OriginalArtNames.campaign(campaign.id),
                 region = OriginalArtCatalog.campaign(campaign.id),
                 contentDescription = campaign.name,
                 modifier = Modifier.fillMaxWidth().height(92.dp).background(Color.Black),
