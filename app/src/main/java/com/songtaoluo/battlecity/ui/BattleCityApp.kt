@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -16,11 +17,17 @@ import com.songtaoluo.battlecity.game.MigratedContentCatalog
 import com.songtaoluo.battlecity.game.VehicleCatalog
 import com.songtaoluo.battlecity.model.AppFlowState
 import com.songtaoluo.battlecity.model.AppStage
+import com.songtaoluo.battlecity.progression.ProgressionSystem
+import com.songtaoluo.battlecity.progression.SaveData
+import com.songtaoluo.battlecity.progression.SharedPreferencesSaveRepository
 
 @Composable
 fun BattleCityApp() {
-    var flow by remember { mutableStateOf(AppFlowState()) }
     val context = LocalContext.current
+    val saveRepository = remember { SharedPreferencesSaveRepository(context) }
+    var saveData by remember { mutableStateOf(saveRepository.load()) }
+    var flow by remember { mutableStateOf(AppFlowState()) }
+    var battleSession by remember { mutableIntStateOf(0) }
     val audioController = remember { AndroidAudioController(context) }
 
     val campaign = flow.campaignId?.let(CampaignCatalog::get)
@@ -34,10 +41,20 @@ fun BattleCityApp() {
         onDispose { audioController.close() }
     }
 
-    LaunchedEffect(flow.stage, scenario?.id) {
+    LaunchedEffect(saveData.settings) {
+        val settings = saveData.settings.normalized()
+        audioController.setMusicEnabled(settings.musicEnabled)
+        audioController.setEffectsEnabled(settings.effectsEnabled)
+        audioController.setMusicVolume(settings.musicVolume)
+        audioController.setEffectsVolume(settings.effectsVolume)
+    }
+
+    LaunchedEffect(flow.stage, scenario?.id, saveData.settings.musicEnabled) {
+        if (!saveData.settings.musicEnabled) return@LaunchedEffect
         when (flow.stage) {
             AppStage.CAMPAIGN,
             AppStage.FACTION,
+            AppStage.SETTINGS,
             -> audioController.switchMusic(MusicThemeResolver.menuFor(null))
 
             AppStage.GARAGE,
@@ -50,10 +67,31 @@ fun BattleCityApp() {
         }
     }
 
+    fun persist(updated: SaveData) {
+        saveData = updated
+        saveRepository.save(updated)
+    }
+
+    fun campaignScreen() = Unit
+
     when (flow.stage) {
-        AppStage.CAMPAIGN -> CampaignSelectScreen { selected ->
-            flow = flow.selectCampaign(selected.id)
-        }
+        AppStage.CAMPAIGN -> CampaignSelectScreen(
+            progress = saveData.progress,
+            onSettings = { flow = flow.showSettings() },
+            onSelect = { selected -> flow = flow.selectCampaign(selected.id) },
+        )
+
+        AppStage.SETTINGS -> SettingsScreen(
+            settings = saveData.settings,
+            progress = saveData.progress,
+            onSettingsChange = { settings ->
+                persist(saveData.copy(settings = settings.normalized()))
+            },
+            onResetProgress = {
+                persist(saveData.copy(progress = com.songtaoluo.battlecity.progression.PlayerProgress()))
+            },
+            onBack = { flow = flow.back() },
+        )
 
         AppStage.FACTION -> {
             if (campaign != null && scenarios.isNotEmpty()) {
@@ -69,7 +107,7 @@ fun BattleCityApp() {
                     },
                 )
             } else {
-                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
+                flow = AppFlowState()
             }
         }
 
@@ -83,7 +121,7 @@ fun BattleCityApp() {
                     onContinue = { flow = flow.showBriefing() },
                 )
             } else {
-                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
+                flow = AppFlowState()
             }
         }
 
@@ -93,16 +131,19 @@ fun BattleCityApp() {
                     scenario = scenario,
                     vehicle = vehicle,
                     onBack = { flow = flow.back() },
-                    onStart = { flow = flow.startBattle() },
+                    onStart = {
+                        battleSession += 1
+                        flow = flow.startBattle()
+                    },
                 )
             } else {
-                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
+                flow = AppFlowState()
             }
         }
 
         AppStage.BATTLE -> {
             if (scenario != null && vehicle != null) {
-                val engine = remember(scenario.id, vehicle.id) {
+                val engine = remember(scenario.id, vehicle.id, battleSession) {
                     GameEngine(
                         scenario = scenario,
                         selectedVehicleId = vehicle.id,
@@ -111,10 +152,18 @@ fun BattleCityApp() {
                 BattleScreen(
                     engine = engine,
                     audioController = audioController,
+                    onBattleFinished = { summary ->
+                        persist(
+                            saveData.copy(
+                                progress = ProgressionSystem.applyBattle(saveData.progress, summary),
+                            ),
+                        )
+                    },
+                    onRestart = { battleSession += 1 },
                     onExit = { flow = flow.back() },
                 )
             } else {
-                CampaignSelectScreen { selected -> flow = flow.selectCampaign(selected.id) }
+                flow = AppFlowState()
             }
         }
     }
