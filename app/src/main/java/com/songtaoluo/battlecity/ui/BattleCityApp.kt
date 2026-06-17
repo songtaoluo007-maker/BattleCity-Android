@@ -17,6 +17,7 @@ import com.songtaoluo.battlecity.game.MigratedContentCatalog
 import com.songtaoluo.battlecity.game.VehicleCatalog
 import com.songtaoluo.battlecity.model.AppFlowState
 import com.songtaoluo.battlecity.model.AppStage
+import com.songtaoluo.battlecity.progression.PlayerProgress
 import com.songtaoluo.battlecity.progression.ProgressionSystem
 import com.songtaoluo.battlecity.progression.SaveData
 import com.songtaoluo.battlecity.progression.SharedPreferencesSaveRepository
@@ -72,14 +73,16 @@ fun BattleCityApp() {
         saveRepository.save(updated)
     }
 
-    fun campaignScreen() = Unit
-
-    when (flow.stage) {
-        AppStage.CAMPAIGN -> CampaignSelectScreen(
+    val showCampaign: @Composable () -> Unit = {
+        CampaignSelectScreen(
             progress = saveData.progress,
             onSettings = { flow = flow.showSettings() },
             onSelect = { selected -> flow = flow.selectCampaign(selected.id) },
         )
+    }
+
+    when (flow.stage) {
+        AppStage.CAMPAIGN -> showCampaign()
 
         AppStage.SETTINGS -> SettingsScreen(
             settings = saveData.settings,
@@ -88,7 +91,7 @@ fun BattleCityApp() {
                 persist(saveData.copy(settings = settings.normalized()))
             },
             onResetProgress = {
-                persist(saveData.copy(progress = com.songtaoluo.battlecity.progression.PlayerProgress()))
+                persist(saveData.copy(progress = PlayerProgress()))
             },
             onBack = { flow = flow.back() },
         )
@@ -107,7 +110,7 @@ fun BattleCityApp() {
                     },
                 )
             } else {
-                flow = AppFlowState()
+                showCampaign()
             }
         }
 
@@ -121,7 +124,7 @@ fun BattleCityApp() {
                     onContinue = { flow = flow.showBriefing() },
                 )
             } else {
-                flow = AppFlowState()
+                showCampaign()
             }
         }
 
@@ -137,7 +140,7 @@ fun BattleCityApp() {
                     },
                 )
             } else {
-                flow = AppFlowState()
+                showCampaign()
             }
         }
 
@@ -163,7 +166,7 @@ fun BattleCityApp() {
                     onExit = { flow = flow.back() },
                 )
             } else {
-                flow = AppFlowState()
+                showCampaign()
             }
         }
     }
