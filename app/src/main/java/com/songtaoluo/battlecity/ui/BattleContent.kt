@@ -29,6 +29,7 @@ import com.songtaoluo.battlecity.game.TargetingMode
 import com.songtaoluo.battlecity.game.VehicleCatalog
 import com.songtaoluo.battlecity.model.Direction
 import kotlinx.coroutines.isActive
+import kotlin.math.ceil
 
 @Composable
 internal fun BattleContent(
@@ -97,17 +98,29 @@ internal fun BattleContent(
 private fun BattleHud(engine: GameEngine, modifier: Modifier) {
     val spec = VehicleCatalog.get(engine.player.vehicleId)
     val focusName = engine.selectedFocusTarget?.let { VehicleCatalog.get(it.vehicleId).shortName } ?: "无"
+    val timerText = if (engine.scenario.objective.holdMs > 0L) {
+        val seconds = ceil(engine.objectiveRemainingMs / 1000.0).toInt()
+        "  坚守 ${seconds}s"
+    } else {
+        ""
+    }
+    val baseText = if (engine.scenario.objective.holdMs > 0L) {
+        if (engine.baseDestroyed) "  基地 已失守" else "  基地 安全"
+    } else {
+        ""
+    }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Text(engine.scenario.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
         Text(
             "SCORE ${engine.score}  军费 ${engine.credits}  指挥点 ${engine.commandPoints}  " +
-                "战果 ${engine.destroyedEnemies}/${engine.scenario.objective.requiredKills}",
+                "战果 ${engine.destroyedEnemies}/${engine.scenario.objective.requiredKills}$timerText",
             color = Color(0xFFE8D9A7),
         )
         Text(
             "${spec.shortName} HP ${engine.player.hp}/${engine.player.maxHp}  " +
                 "友军 ${engine.alliesAlive}  敌军在场 ${engine.enemies.size}  剩余 ${engine.enemiesLeft}  " +
-                "补给 ${engine.powerUps.size}  集火 $focusName",
+                "补给 ${engine.powerUps.size}  集火 $focusName$baseText",
             color = Color(0xFFD8D0A8),
         )
         Text(engine.combatMessage, color = Color(0xFFFFE082))
