@@ -83,7 +83,9 @@ object VisibilitySystem {
         target: Tank,
         smoke: TacticalArea?,
         recon: TacticalArea?,
-    ): Boolean = recon?.active == true && recon.contains(target.position) &&
+    ): Boolean = target.team == TeamSide.ENEMY &&
+        recon?.active == true &&
+        recon.contains(target.position) &&
         !(smoke?.active == true && smoke.contains(target.position))
 }
 
@@ -122,6 +124,4 @@ object SupportSkillSystem {
         } else {
             GameConstants.AIR_STRIKE_LIGHT_DAMAGE
         }
-
-    fun isFriendly(team: TeamSide): Boolean = team != TeamSide.ENEMY
 }
