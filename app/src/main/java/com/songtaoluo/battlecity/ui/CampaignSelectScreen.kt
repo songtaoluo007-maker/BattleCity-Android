@@ -3,6 +3,7 @@ package com.songtaoluo.battlecity.ui
 import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,8 +21,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.songtaoluo.battlecity.game.CampaignCatalog
 import com.songtaoluo.battlecity.game.MigratedContentCatalog
@@ -83,21 +86,46 @@ private fun CampaignCard(
     val playable = MigratedContentCatalog.isCampaignPlayable(campaign.id)
     val accent = Color(AndroidColor.parseColor(campaign.iconColor))
     Card(
-        modifier = Modifier.width(270.dp).height(250.dp),
+        modifier = Modifier.width(290.dp).height(315.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xEE1A1F1A)),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(18.dp),
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Spacer(Modifier.fillMaxWidth().height(8.dp).background(accent))
-            Text(campaign.name, color = Color.White, style = MaterialTheme.typography.titleLarge)
-            Text(campaign.subtitle, color = Color(0xFFFFD54F))
-            if (completed) Text("战役已完成", color = Color(0xFF9CCC65))
-            Text(campaign.description, color = Color(0xFFD6D8D1), modifier = Modifier.weight(1f))
-            Text("难度 ${campaign.difficulty} · ${campaign.scenarioCount}条战线", color = Color(0xFFB8BCAE))
-            Button(onClick = { onSelect(campaign) }, enabled = playable, modifier = Modifier.fillMaxWidth()) {
-                Text(if (playable) "进入战役" else "内容迁移中")
+            Box(Modifier.fillMaxWidth().height(128.dp)) {
+                OriginalArtImage(
+                    stem = OriginalArt.campaignStem(campaign.id),
+                    contentDescription = campaign.name,
+                    contentScale = ContentScale.Crop,
+                    fallbackLabel = campaign.name,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(7.dp)
+                        .background(accent),
+                )
+            }
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(campaign.name, color = Color.White, style = MaterialTheme.typography.titleLarge)
+                Text(campaign.subtitle, color = Color(0xFFFFD54F))
+                if (completed) Text("战役已完成", color = Color(0xFF9CCC65))
+                Text(
+                    campaign.description,
+                    color = Color(0xFFD6D8D1),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text("难度 ${campaign.difficulty} · ${campaign.scenarioCount}条战线", color = Color(0xFFB8BCAE))
+                Button(onClick = { onSelect(campaign) }, enabled = playable, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (playable) "进入战役" else "内容迁移中")
+                }
             }
         }
     }
