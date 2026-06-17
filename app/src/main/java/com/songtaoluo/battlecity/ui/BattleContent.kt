@@ -57,6 +57,10 @@ internal fun BattleContent() {
             onChange = engine::setSquadOrder,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
         )
+        SupportControls(
+            engine = engine,
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 18.dp),
+        )
         Button(
             onClick = engine::fire,
             enabled = engine.player.alive && !engine.victory,
@@ -74,12 +78,14 @@ private fun BattleHud(engine: GameEngine, modifier: Modifier) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Text(engine.scenario.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
         Text(
-            "SCORE ${engine.score}  军费 ${engine.credits}  战果 ${engine.destroyedEnemies}/${engine.scenario.objective.requiredKills}",
+            "SCORE ${engine.score}  军费 ${engine.credits}  指挥点 ${engine.commandPoints}  " +
+                "战果 ${engine.destroyedEnemies}/${engine.scenario.objective.requiredKills}",
             color = Color(0xFFE8D9A7),
         )
         Text(
             "${spec.shortName} HP ${engine.player.hp}/${engine.player.maxHp}  " +
-                "友军 ${engine.alliesAlive}  敌军在场 ${engine.enemies.size}  剩余 ${engine.enemiesLeft}",
+                "友军 ${engine.alliesAlive}  敌军在场 ${engine.enemies.size}  剩余 ${engine.enemiesLeft}  " +
+                "补给 ${engine.powerUps.size}",
             color = Color(0xFFD8D0A8),
         )
         Text(engine.combatMessage, color = Color(0xFFFFE082))
