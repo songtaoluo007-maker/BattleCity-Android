@@ -25,18 +25,10 @@ jobs:
 
           path = Path('app/src/main/java/com/songtaoluo/battlecity/ui/BattleContent.kt')
           text = path.read_text(encoding='utf-8')
-          old = '''                ResultPanel(
-                      engine = engine,
-                      onRestart = onRestart,
-                      onExit = onExit,
-                  )'''
-          new = '''                ResultArtPanel(
-                      engine = engine,
-                      onRestart = onRestart,
-                      onExit = onExit,
-                  )'''
-          if old not in text:
-              raise SystemExit('ResultPanel call not found')
+          old = '                ResultPanel('
+          new = '                ResultArtPanel('
+          if text.count(old) != 1:
+              raise SystemExit(f'ResultPanel call matches: {text.count(old)}')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
 
